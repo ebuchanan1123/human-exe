@@ -72,7 +72,7 @@ export function FinalEvaluation({
   // Reveal one result at a time, then hand over to the Gatekeeper's breakdown.
   useEffect(() => {
     if (phase !== "report") return;
-    const delay = revealed === 0 ? 1000 : revealed < TOTAL_ROWS ? 850 : 2000;
+    const delay = revealed === 0 ? 2400 : revealed < TOTAL_ROWS ? 2600 : 3200;
     const id = window.setTimeout(() => {
       if (revealed < TOTAL_ROWS) setRevealed((r) => r + 1);
       else setPhase("meltdown");
