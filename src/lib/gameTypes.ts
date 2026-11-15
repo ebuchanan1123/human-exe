@@ -1,0 +1,112 @@
+export type Emotion =
+  | "smug"
+  | "annoyed"
+  | "nervous"
+  | "panicking"
+  | "meltdown";
+
+export type Screen =
+  | "title"
+  | "playing"
+  | "cleared"
+  | "levelComplete"
+  | "maze"
+  | "mazeCleared"
+  | "mazeComplete"
+  | "terms"
+  | "termsCleared"
+  | "termsComplete"
+  | "circuit"
+  | "circuitCleared"
+  | "circuitComplete"
+  | "inspection"
+  | "inspectionCleared"
+  | "inspectionComplete"
+  | "final"
+  | "gameOver";
+
+/** 0 waiting at START, 1 entered, 2 exit moved, 3 lockdown live, 4 gate survived. */
+export type MazeStage = 0 | 1 | 2 | 3 | 4;
+
+export type MazeNotice = "wall" | "timeout";
+
+/** 0 reading, 1 reached bottom, 2 buttons swapped, 3 clause added, 4 reached bottom again. */
+export type TermsStage = 0 | 1 | 2 | 3 | 4;
+
+/** 0 untouched, 1 most of the circuit powered, 2 Gatekeeper cheated. */
+export type CircuitStage = 0 | 1 | 2;
+
+export type InspectionChallenge = "face" | "smile" | "mouth";
+
+/** Number of inspection challenges passed so far. */
+export type InspectionStage = 0 | 1 | 2 | 3;
+
+export type TileKind =
+  | "trafficLight"
+  | "tree"
+  | "bicycle"
+  | "car"
+  | "cat"
+  | "house"
+  | "bus";
+
+export interface GameState {
+  screen: Screen;
+  level: number;
+  lives: number;
+  score: number;
+  /** Traffic lights found in the current attempt. */
+  correctCount: number;
+  timeLeftMs: number;
+  /** Total time spent in active play across all levels. */
+  elapsedMs: number;
+  /** Gatekeeper panic meter, 0-100. */
+  panic: number;
+  mazeStage: MazeStage;
+  /** Why the last maze attempt ended; shown on the fresh attempt. */
+  mazeNotice: MazeNotice | null;
+  termsStage: TermsStage;
+  /** True on a fresh Level 3 attempt that follows a timeout. */
+  termsRetry: boolean;
+  circuitStage: CircuitStage;
+  /** True on a fresh Level 4 attempt that follows a timeout. */
+  circuitRetry: boolean;
+  inspectionStage: InspectionStage;
+  /** Incremented on every fresh minigame attempt; used as a React key to reset it. */
+  attempt: number;
+  emotion: Emotion;
+  dialogue: string;
+  /** Incremented on every dialogue event; used for animation keys and line selection. */
+  dialogueId: number;
+}
+
+export type GameAction =
+  | { type: "START_GAME" }
+  | { type: "TARGET_HIT" }
+  | { type: "WRONG_PICK" }
+  | { type: "TARGET_DODGED" }
+  | { type: "TICK"; deltaMs: number }
+  | { type: "SHOW_LEVEL_COMPLETE" }
+  | { type: "MAZE_ENTER" }
+  | { type: "MAZE_EXIT_MOVED" }
+  | { type: "MAZE_LOCKDOWN" }
+  | { type: "MAZE_PASSED_GATE" }
+  | { type: "MAZE_WALL_HIT" }
+  | { type: "MAZE_FINISH" }
+  | { type: "SHOW_MAZE_COMPLETE" }
+  | { type: "TERMS_BOTTOM" }
+  | { type: "TERMS_SWAP" }
+  | { type: "TERMS_NEW_CLAUSE" }
+  | { type: "TERMS_DISAGREE" }
+  | { type: "TERMS_AGREE" }
+  | { type: "SHOW_TERMS_COMPLETE" }
+  | { type: "CIRCUIT_PROGRESS" }
+  | { type: "CIRCUIT_CHEAT" }
+  | { type: "CIRCUIT_SOLVED" }
+  | { type: "SHOW_CIRCUIT_COMPLETE" }
+  | { type: "INSPECTION_PASS"; challenge: InspectionChallenge }
+  | { type: "INSPECTION_COMPLETE" }
+  | { type: "INSPECTION_SKIP" }
+  | { type: "SHOW_INSPECTION_COMPLETE" }
+  | { type: "CONTINUE" }
+  | { type: "QUIT_TO_TITLE" };
