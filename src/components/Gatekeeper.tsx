@@ -190,13 +190,6 @@ export function Gatekeeper({
           )}
         </AnimatePresence>
 
-        <span
-          className="absolute left-2 top-2 px-2 py-1 font-pixel text-[9px] text-bg"
-          style={{ backgroundColor: meta.color }}
-        >
-          {meta.label}
-        </span>
-
         {notice && (
           <div
             key={dialogueId ?? notice}
