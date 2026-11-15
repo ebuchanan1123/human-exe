@@ -466,6 +466,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...say(state, DIALOGUE.circuit.cheat, "panicking"),
       };
 
+    case "CIRCUIT_SABOTAGE":
+      if (state.screen !== "circuit") return state;
+      return {
+        ...state,
+        panic: action.near ? Math.max(state.panic, CIRCUIT.panic.cheat) : state.panic,
+        ...say(
+          state,
+          pick(DIALOGUE.circuit.sabotage, action.count),
+          action.near ? "panicking" : "annoyed",
+        ),
+      };
+
     case "CIRCUIT_SOLVED":
       if (state.screen !== "circuit") return state;
       return {
@@ -633,6 +645,10 @@ export function useGameEngine() {
   const termsAgree = useCallback(() => dispatch({ type: "TERMS_AGREE" }), []);
   const circuitProgress = useCallback(() => dispatch({ type: "CIRCUIT_PROGRESS" }), []);
   const circuitCheat = useCallback(() => dispatch({ type: "CIRCUIT_CHEAT" }), []);
+  const circuitSabotage = useCallback(
+    (count: number, near: boolean) => dispatch({ type: "CIRCUIT_SABOTAGE", count, near }),
+    [],
+  );
   const circuitSolved = useCallback(() => dispatch({ type: "CIRCUIT_SOLVED" }), []);
   const inspectionPass = useCallback(
     (challenge: InspectionChallenge, source: InspectionSource) =>
@@ -667,6 +683,7 @@ export function useGameEngine() {
     termsAgree,
     circuitProgress,
     circuitCheat,
+    circuitSabotage,
     circuitSolved,
     inspectionPass,
     inspectionSkip,

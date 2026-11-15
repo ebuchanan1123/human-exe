@@ -17,7 +17,7 @@ export const LEVEL1 = {
   /** Pointer distance (in tile widths) from a target's centre that triggers a dodge. */
   dodgeTriggerRadius: 0.85,
   /** Hover cheat: resting on a target this long makes the Gatekeeper swap it with a decoy. */
-  hoverSwapMs: 500,
+  hoverSwapMs: 1_000,
   /** Minimum gap between any two hover swaps. */
   swapCooldownMs: 1_000,
   maxSwapsPerTarget: 2,
@@ -37,7 +37,7 @@ export const MAZE = {
   lockdownWarnMs: 1_500,
   /** Shrinking corridor section: warning, then jaws close once per attempt. */
   squeezeWarnMs: 1_000,
-  squeezeCloseMs: 1_200,
+  squeezeCloseMs: 1_000,
   /** Jaws stop this far (maze units) short of the cursor while closing. */
   squeezeClearance: 3,
   gate: {
@@ -78,6 +78,14 @@ export const CIRCUIT = {
   clearedDelayMs: 1_600,
   /** Warning time between the maintenance alert and the tile turning back. */
   warnMs: 1_800,
+  /** Repeating sabotage: after the grace period the Gatekeeper turns one tile at random intervals. */
+  sabotage: {
+    graceMs: 5_000,
+    minGapMs: 6_000,
+    maxGapMs: 8_000,
+    maxCount: 4,
+    warnMs: 800,
+  },
   panic: {
     base: 75,
     progress: 88,
@@ -214,6 +222,12 @@ export const DIALOGUE = {
     intro: "You can't brute-force electrical engineering.",
     progress: "STOP CONNECTING THINGS.",
     cheat: "Routine security maintenance. Nothing suspicious.",
+    sabotage: [
+      "WHOOPS. SECURITY MAINTENANCE.",
+      "That wire looked suspicious.",
+      "STOP FIXING MY CIRCUIT.",
+      "I'M ALLOWED TO TOUCH THE BOARD. YOU'RE NOT.",
+    ],
     timeout: "Power failure. Have you tried plugging yourself in?",
     complete: "WHO GAVE YOU ACCESS TO THE POWER GRID?!",
   },

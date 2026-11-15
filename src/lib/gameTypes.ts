@@ -129,6 +129,7 @@ export type GameAction =
   | { type: "SHOW_TERMS_COMPLETE" }
   | { type: "CIRCUIT_PROGRESS" }
   | { type: "CIRCUIT_CHEAT" }
+  | { type: "CIRCUIT_SABOTAGE"; count: number; near: boolean }
   | { type: "CIRCUIT_SOLVED" }
   | { type: "SHOW_CIRCUIT_COMPLETE" }
   | { type: "INSPECTION_PASS"; challenge: InspectionChallenge; source: InspectionSource }

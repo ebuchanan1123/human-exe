@@ -1,18 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { OctagonX } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { CoffeeShopSite } from "@/components/landing/CoffeeShopSite";
-import { FakeCaptcha } from "@/components/landing/FakeCaptcha";
+import { CAPTCHA_DESC_ID, CAPTCHA_TITLE_ID, FakeCaptcha } from "@/components/landing/FakeCaptcha";
 import type { CaptchaState } from "@/components/landing/FakeCaptcha";
 import { PixelButton } from "@/components/PixelButton";
 import { RetroWindow } from "@/components/RetroWindow";
 import { GATEKEEPER_SPRITES } from "@/lib/gameConfig";
 
-type Phase = "idle" | "verifying" | "verified" | "glitch" | "error" | "corrupt" | "launching";
+/** browsing: plain site. idle/verifying/verified: modal up. The rest is the failure sequence. */
+type Phase =
+  | "browsing"
+  | "idle"
+  | "verifying"
+  | "verified"
+  | "glitch"
+  | "error"
+  | "corrupt"
+  | "launching";
 
 const NEXT: Record<Exclude<Phase, "idle" | "launching">, Phase> = {
+  browsing: "idle",
   verifying: "verified",
   verified: "glitch",
   glitch: "error",
@@ -21,6 +32,7 @@ const NEXT: Record<Exclude<Phase, "idle" | "launching">, Phase> = {
 };
 
 const DURATION_MS: Record<Exclude<Phase, "idle">, number> = {
+  browsing: 2_000,
   verifying: 1000,
   verified: 550,
   glitch: 650,
@@ -42,10 +54,10 @@ interface CoffeeShopLandingProps {
   onLaunch: () => void;
 }
 
-/** The opening fake website: a normal coffee shop page with a parody verification checkbox. */
+/** The opening fake website: a normal coffee shop page, then a mandatory parody verification modal. */
 export function CoffeeShopLanding({ onLaunch }: CoffeeShopLandingProps) {
   const reduceMotion = useReducedMotion();
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [phase, setPhase] = useState<Phase>("browsing");
   const launched = useRef(false);
 
   // Warm the Gatekeeper sprites so the first dialogue scene appears fully drawn.
@@ -69,11 +81,29 @@ export function CoffeeShopLanding({ onLaunch }: CoffeeShopLandingProps) {
     return () => window.clearTimeout(id);
   }, [phase, reduceMotion, onLaunch]);
 
+  const dimmed = phase !== "browsing";
+
+  // The page behind the modal must not scroll while verification is mandatory.
+  useEffect(() => {
+    if (!dimmed) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [dimmed]);
+
+  const modalOpen = phase === "idle" || phase === "verifying" || phase === "verified";
   const captchaState: CaptchaState =
     phase === "idle" ? "idle" : phase === "verifying" ? "verifying" : "verified";
   const glitching = phase === "glitch";
   const corrupted = phase === "corrupt" || phase === "launching";
   const tinted = corrupted || phase === "error";
+
+  // The only focusable control is the checkbox, so keep Tab from leaving the modal.
+  const trapTab = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Tab") event.preventDefault();
+  };
 
   return (
     <>
@@ -81,14 +111,37 @@ export function CoffeeShopLanding({ onLaunch }: CoffeeShopLandingProps) {
         className={`${glitching ? "site-glitch-soft" : ""} ${
           corrupted ? "site-glitch-hard" : ""
         } ${tinted ? "site-corrupt" : ""}`}
-        inert={phase !== "idle"}
+        inert={dimmed}
       >
-        <CoffeeShopSite
-          widget={
-            <FakeCaptcha state={captchaState} onActivate={() => setPhase("verifying")} />
-          }
-        />
+        <CoffeeShopSite />
       </div>
+
+      {dimmed && (
+        <motion.div
+          className="fixed inset-0 z-30 bg-black/[0.55]"
+          initial={{ opacity: reduceMotion ? 1 : 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: reduceMotion ? 0 : 0.25 }}
+          aria-hidden="true"
+        />
+      )}
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center px-4" onKeyDown={trapTab}>
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={CAPTCHA_TITLE_ID}
+            aria-describedby={CAPTCHA_DESC_ID}
+            className="w-[min(100%,26rem)]"
+            initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
+          >
+            <FakeCaptcha state={captchaState} onActivate={() => setPhase("verifying")} />
+          </motion.div>
+        </div>
+      )}
 
       {(glitching || corrupted) && !reduceMotion && (
         <div className="landing-bars pointer-events-none fixed inset-0 z-40" aria-hidden="true">
@@ -100,7 +153,7 @@ export function CoffeeShopLanding({ onLaunch }: CoffeeShopLandingProps) {
       )}
 
       {phase === "error" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
             role="alertdialog"
             aria-labelledby="landing-error-title"

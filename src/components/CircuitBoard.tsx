@@ -14,6 +14,7 @@ import {
   isSolved,
   piecesFromTurns,
   poweredPathCount,
+  pickSabotageTile,
 } from "@/lib/circuitEngine";
 import type { Direction, PieceKind } from "@/lib/circuitEngine";
 
@@ -24,6 +25,8 @@ interface CircuitBoardProps {
   retry: boolean;
   onProgress: () => void;
   onCheat: () => void;
+  /** The Gatekeeper is turning a tile; count is how many times so far, near means the player is close to winning. */
+  onSabotage: (count: number, near: boolean) => void;
   onSolved: () => void;
 }
 
@@ -160,18 +163,19 @@ const CircuitTile = memo(function CircuitTile({
   );
 });
 
-export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSolved }: CircuitBoardProps) {
+export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSabotage, onSolved }: CircuitBoardProps) {
   const [turns, setTurns] = useState<number[]>(createInitialTurns);
   const [warning, setWarning] = useState<number | null>(null);
+  const [sabotageTile, setSabotageTile] = useState<number | null>(null);
   const [cheated, setCheated] = useState(false);
   const [moved, setMoved] = useState(false);
 
   // Refs hold what timers and rapid clicks must read synchronously, so no event sees stale state.
   const turnsRef = useRef(turns);
-  const flags = useRef({ won: false, progressed: false });
-  const latest = useRef({ onProgress, onCheat, onSolved });
+  const flags = useRef({ won: false, progressed: false, cheatPending: false, sabotages: 0 });
+  const latest = useRef({ onProgress, onCheat, onSabotage, onSolved });
   useEffect(() => {
-    latest.current = { onProgress, onCheat, onSolved };
+    latest.current = { onProgress, onCheat, onSabotage, onSolved };
   });
 
   const pieces = useMemo(() => piecesFromTurns(turns), [turns]);
@@ -206,6 +210,7 @@ export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSolved }: C
         latest.current.onProgress();
         // Warn on the furthest powered route tile, then reverse it once.
         const target = [...PATH_ORDER].reverse().find((i) => nextPower.has(i)) ?? PATH_ORDER[0];
+        f.cheatPending = true;
         setWarning(target);
       }
     },
@@ -216,6 +221,7 @@ export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSolved }: C
     if (warning === null || frozen) return;
     const id = window.setTimeout(() => {
       setWarning(null);
+      flags.current.cheatPending = false;
       if (flags.current.won) return;
       const next = [...turnsRef.current];
       next[warning] -= 1;
@@ -228,10 +234,59 @@ export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSolved }: C
     return () => window.clearTimeout(id);
   }, [warning, frozen, commit]);
 
+  // Repeating sabotage: after a grace period the Gatekeeper warns, then turns one tile, a few times per attempt.
+  useEffect(() => {
+    if (frozen) return;
+    const cfg = CIRCUIT.sabotage;
+    const between = (min: number, max: number) => min + Math.random() * (max - min);
+    let timer: number | undefined;
+
+    const schedule = (ms: number, fn: () => void) => {
+      timer = window.setTimeout(fn, ms);
+    };
+
+    function begin() {
+      const f = flags.current;
+      if (f.won || f.sabotages >= cfg.maxCount) return;
+      // Wait out the one-off cheat warning and background tabs rather than overlapping them.
+      if (f.cheatPending || document.hidden) {
+        schedule(1_000, begin);
+        return;
+      }
+      const tile = pickSabotageTile(turnsRef.current);
+      if (tile === null) {
+        schedule(1_000, begin);
+        return;
+      }
+      f.sabotages += 1;
+      const near = poweredPathCount(computePower(piecesFromTurns(turnsRef.current))) >= MOSTLY_POWERED;
+      setSabotageTile(tile);
+      latest.current.onSabotage(f.sabotages - 1, near);
+      schedule(cfg.warnMs, () => turn(tile));
+    }
+
+    function turn(tile: number) {
+      setSabotageTile(null);
+      const f = flags.current;
+      if (f.won) return;
+      const next = [...turnsRef.current];
+      next[tile] += 1;
+      // Never complete the circuit for the player.
+      if (!isSolved(piecesFromTurns(next))) commit(next);
+      if (f.sabotages < cfg.maxCount) schedule(between(cfg.minGapMs, cfg.maxGapMs), begin);
+    }
+
+    schedule(cfg.graceMs + between(1_000, 3_000), begin);
+    return () => {
+      window.clearTimeout(timer);
+      setSabotageTile(null);
+    };
+  }, [frozen, commit]);
+
   const poweredTiles = poweredPathCount(powered);
   let status = "CLICK A PIECE TO ROTATE IT. CONNECT SOURCE TO TERMINAL.";
   if (solved) status = "CIRCUIT COMPLETE. TERMINAL ONLINE.";
-  else if (warning !== null) status = "!! SECURITY MAINTENANCE IN PROGRESS !!";
+  else if (warning !== null || sabotageTile !== null) status = "!! SECURITY MAINTENANCE IN PROGRESS !!";
   else if (cheated) status = "MAINTENANCE COMPLETE. ONE PIECE WAS TURNED BACK. KEEP GOING.";
   else if (poweredTiles > 0) status = `${poweredTiles}/${PATH_ORDER.length} ROUTE PIECES POWERED. TERMINAL ${terminalPowered ? "ONLINE" : "OFFLINE"}.`;
 
@@ -251,7 +306,7 @@ export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSolved }: C
               kind={cell.kind}
               turns={turns[i]}
               powered={powered.has(i)}
-              warned={warning === i}
+              warned={warning === i || sabotageTile === i}
               celebrate={frozen && solved}
               onRotate={frozen ? noop : rotate}
             />
@@ -261,7 +316,9 @@ export function CircuitBoard({ frozen, retry, onProgress, onCheat, onSolved }: C
 
       <p
         className={`bevel-in min-h-[3rem] px-3 py-2 text-center font-pixel text-[10px] leading-relaxed ${
-          warning !== null ? "animate-pulse-fast bg-danger text-bg" : "bg-bg text-cream/80"
+          warning !== null || sabotageTile !== null
+            ? "animate-pulse-fast bg-danger text-bg"
+            : "bg-bg text-cream/80"
         }`}
         role="status"
       >

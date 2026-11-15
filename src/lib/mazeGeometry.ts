@@ -71,14 +71,14 @@ export function inCell(p: Point, cell: Cell, pad = 0): boolean {
 /**
  * The one narrowing section: the bottom corridor (row 5, cols 3-5). Two jaws
  * close in from the walls above and below, each up to maxIntrude units, so the
- * corridor shrinks from 40 to 24 wide and never closes.
+ * corridor shrinks from 40 to 18 wide (45%) and never closes.
  */
 export const SQUEEZE = {
   x0: 3 * MAZE_CELL,
   x1: 6 * MAZE_CELL,
   yTop: 5 * MAZE_CELL,
   yBottom: 6 * MAZE_CELL,
-  maxIntrude: 8,
+  maxIntrude: 11,
   /** Walking into this rectangle (the approach from the west) triggers the lockdown. */
   trigger: { x0: 70, x1: 3 * MAZE_CELL, y0: 5 * MAZE_CELL, y1: 6 * MAZE_CELL },
 } as const;

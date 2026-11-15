@@ -269,6 +269,7 @@ export function Game() {
                       retry={state.circuitRetry}
                       onProgress={engine.circuitProgress}
                       onCheat={engine.circuitCheat}
+                      onSabotage={engine.circuitSabotage}
                       onSolved={engine.circuitSolved}
                     />
                     {screen === "circuitCleared" && (

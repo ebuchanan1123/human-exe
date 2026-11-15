@@ -1,10 +1,4 @@
-import type { ReactNode } from "react";
 import { Clock, Coffee, Croissant, CupSoda, Leaf, MapPin, ShoppingBag } from "lucide-react";
-
-interface CoffeeShopSiteProps {
-  /** The verification widget, shown in the hero. */
-  widget: ReactNode;
-}
 
 const MENU = [
   {
@@ -34,7 +28,7 @@ const MENU = [
 ] as const;
 
 /** A believable, completely ordinary neighborhood coffee shop page (fictional). */
-export function CoffeeShopSite({ widget }: CoffeeShopSiteProps) {
+export function CoffeeShopSite() {
   return (
     <div className="min-h-screen bg-bean-cream font-site-sans text-bean-brown">
       <header className="border-b border-bean-latte">
@@ -50,7 +44,7 @@ export function CoffeeShopSite({ widget }: CoffeeShopSiteProps) {
             <a href="#story" className="hover:text-bean-green">Our Story</a>
             <a href="#visit" className="hover:text-bean-green">Visit</a>
             <a
-              href="#verify"
+              href="#menu"
               className="rounded-full bg-bean-green px-4 py-2 text-bean-cream hover:bg-bean-green-dark"
             >
               Order Ahead
@@ -73,12 +67,12 @@ export function CoffeeShopSite({ widget }: CoffeeShopSiteProps) {
               Maple Street since 2012.
             </p>
 
-            <div id="verify" className="mt-8 max-w-sm scroll-mt-8">
-              <p className="mb-2 text-sm font-medium text-bean-green">
-                Quick check before you order ahead or view the full menu:
-              </p>
-              {widget}
-            </div>
+            <a
+              href="#menu"
+              className="mt-8 inline-block rounded-full bg-bean-green px-6 py-3 font-medium text-bean-cream hover:bg-bean-green-dark"
+            >
+              See today&apos;s menu
+            </a>
           </div>
 
           <HeroIllustration />
@@ -87,9 +81,7 @@ export function CoffeeShopSite({ widget }: CoffeeShopSiteProps) {
         <section id="menu" className="bg-bean-latte/60 py-14">
           <div className="mx-auto max-w-6xl px-5">
             <h2 className="font-site-serif text-3xl font-semibold text-bean-green">Today&apos;s favorites</h2>
-            <p className="mt-2 max-w-lg">
-              A taste of what&apos;s brewing. The full menu is just a quick check away.
-            </p>
+            <p className="mt-2 max-w-lg">Fresh every morning, made with care.</p>
             <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {MENU.map(({ name, blurb, price, Icon }) => (
                 <li key={name} className="rounded-2xl border border-bean-latte bg-bean-cream p-5 shadow-sm">

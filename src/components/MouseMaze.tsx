@@ -91,6 +91,7 @@ export function MouseMaze({
     passedGate: false,
     squeeze: "none" as Squeeze,
     squeezeAt: 0,
+    squeezeElapsed: 0,
     jawTop: 0,
     jawBottom: 0,
     exitWarning: false,
@@ -131,19 +132,20 @@ export function MouseMaze({
       if (s.status === "active" && !latest.current.frozen) {
         if (s.squeeze === "warning" && now >= s.squeezeAt) {
           s.squeeze = "closing";
+          s.squeezeElapsed = 0;
           setSqueeze("closing");
         }
         if (s.squeeze === "closing") {
-          // Jaws never advance onto the cursor: each stops a few units short of it.
+          // Frame-time accumulation: takes exactly squeezeCloseMs of active play and never jumps after a pause.
+          // A jaw never advances onto the cursor: it stops a few units short and resumes once clear.
           const { maxIntrude, x0, x1, yTop, yBottom } = SQUEEZE;
-          const stepUnits = (dt / MAZE.squeezeCloseMs) * maxIntrude;
+          s.squeezeElapsed += dt;
+          const wanted = Math.min(1, s.squeezeElapsed / MAZE.squeezeCloseMs) * maxIntrude;
           const near = s.prev !== null && s.prev.x >= x0 - 20 && s.prev.x < x1 + 20;
           const capTop = near && s.prev ? s.prev.y - yTop - MAZE.squeezeClearance : maxIntrude;
           const capBottom = near && s.prev ? yBottom - s.prev.y - MAZE.squeezeClearance : maxIntrude;
-          const limitTop = Math.min(maxIntrude, capTop);
-          const limitBottom = Math.min(maxIntrude, capBottom);
-          if (s.jawTop < limitTop) s.jawTop = Math.min(limitTop, s.jawTop + stepUnits);
-          if (s.jawBottom < limitBottom) s.jawBottom = Math.min(limitBottom, s.jawBottom + stepUnits);
+          s.jawTop = Math.max(s.jawTop, Math.min(wanted, capTop));
+          s.jawBottom = Math.max(s.jawBottom, Math.min(wanted, capBottom));
           jawTopRef.current?.setAttribute("height", String(s.jawTop));
           if (jawBottomRef.current) {
             jawBottomRef.current.setAttribute("y", String(yBottom - s.jawBottom));
@@ -473,7 +475,7 @@ export function MouseMaze({
                 width={SQUEEZE.x1 - SQUEEZE.x0}
                 height="0"
                 fill="url(#hazard-pattern)"
-                stroke="#131D25"
+                stroke={squeeze === "closing" ? "#F1A59C" : "#131D25"}
                 strokeWidth="1"
               />
               <rect
@@ -483,7 +485,7 @@ export function MouseMaze({
                 width={SQUEEZE.x1 - SQUEEZE.x0}
                 height="0"
                 fill="url(#hazard-pattern)"
-                stroke="#131D25"
+                stroke={squeeze === "closing" ? "#F1A59C" : "#131D25"}
                 strokeWidth="1"
               />
             </g>

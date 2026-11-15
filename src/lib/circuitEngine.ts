@@ -137,6 +137,27 @@ export function poweredPathCount(powered: ReadonlySet<number>): number {
 }
 
 /**
+ * Tile the Gatekeeper turns next: an editable tile whose quarter turn would not complete the
+ * circuit, preferring a correctly placed, powered route tile. Null when nothing qualifies.
+ */
+export function pickSabotageTile(turns: readonly number[], random: () => number = Math.random): number | null {
+  const pieces = piecesFromTurns(turns);
+  const powered = computePower(pieces);
+  const candidates = PUZZLE.flatMap((c, i) => {
+    if (!c.editable) return [];
+    const next = [...turns];
+    next[i] += 1;
+    return isSolved(piecesFromTurns(next)) ? [] : [i];
+  });
+  if (candidates.length === 0) return null;
+  const onRoute = candidates.filter(
+    (i) => PATH_ORDER.includes(i) && powered.has(i) && normalizeRotation(turns[i]) === PUZZLE[i].solution,
+  );
+  const pool = onRoute.length > 0 ? onRoute : candidates;
+  return pool[Math.floor(random() * pool.length)];
+}
+
+/**
  * Random starting turns for every editable tile. Any rotation set is solvable
  * because each tile can be turned to its solution orientation, so we only
  * re-roll boards that are already solved or already mostly powered.
