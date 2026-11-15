@@ -49,12 +49,12 @@ export const MAZE = {
     slideMs: 200,
   },
   panic: {
-    base: 50,
-    enter: 60,
-    exitMoved: 80,
-    lockdown: 86,
-    passedGate: 92,
-    finish: 97,
+    base: 40,
+    enter: 44,
+    exitMoved: 52,
+    lockdown: 56,
+    passedGate: 60,
+    finish: 64,
   },
 } as const;
 
@@ -65,12 +65,12 @@ export const TERMS = {
   /** Both buttons ignore input this long after a swap so the same click can't land twice. */
   swapLockMs: 600,
   panic: {
-    base: 70,
-    bottom: 78,
-    swap: 86,
-    clause: 93,
-    finalBottom: 96,
-    finish: 100,
+    base: 66,
+    bottom: 69,
+    swap: 73,
+    clause: 77,
+    finalBottom: 80,
+    finish: 82,
   },
 } as const;
 
@@ -89,10 +89,10 @@ export const CIRCUIT = {
     warnMs: 800,
   },
   panic: {
-    base: 75,
+    base: 84,
     progress: 88,
-    cheat: 94,
-    finish: 100,
+    cheat: 91,
+    finish: 93,
   },
 } as const;
 
@@ -126,8 +126,8 @@ export const INSPECTION = {
   /** Mouth-corner score floor for each side, relative to the smile threshold. */
   smileSideRatio: 0.5,
   panic: {
-    face: 90,
-    smile: 95,
+    face: 94,
+    smile: 96,
     mouth: 98,
     shake: 99,
     finish: 100,
@@ -164,13 +164,13 @@ export const EMOTION_META: Record<
 };
 
 /** Panic meter value (0-100) by number of traffic lights found. */
-export const PANIC_BY_HITS: readonly number[] = [8, 40, 75, 100];
+export const PANIC_BY_HITS: readonly number[] = [8, 18, 28, 36];
 
 export const EMOTION_BY_HITS: readonly Emotion[] = [
   "smug",
+  "smug",
   "annoyed",
-  "nervous",
-  "panicking",
+  "annoyed",
 ];
 
 /** Fake moderation-log lines shown beside the sprite when the Gatekeeper abuses his powers. */
@@ -190,7 +190,7 @@ export const MOD_NOTICES = {
  */
 export const DIALOGUE = {
   start: "select the traffic lights. shouldn't be hard. for normal people.",
-  hits: ["lucky guess.", "wait how did you do that.", "okay that literally doesn't count."],
+  hits: ["lucky guess.", "okay relax.", "okay that literally doesn't count."],
   /** Wrong tile picks; a line naming the tile (wrongNamed) is added to the pool. */
   wrong: ["skill issue tbh.", "did you even look?", "negative aura.", "uninstall your mouse."],
   wrongNamed: (tile: string) => `bro clicked the ${tile.toUpperCase()}.`,

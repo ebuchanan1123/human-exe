@@ -59,7 +59,6 @@ export function Game() {
       status={modStatus}
       notice={state.modNotice}
       startled={
-        screen === "cleared" ||
         screen === "mazeCleared" ||
         screen === "termsCleared" ||
         screen === "circuitCleared" ||

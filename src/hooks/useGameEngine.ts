@@ -97,7 +97,7 @@ function loseLife(state: GameState, cause: "timeout" | "wall"): GameState {
       circuitStage: 0,
       circuitRetry: true,
       panic: CIRCUIT.panic.base,
-      ...say(state, DIALOGUE.circuit.timeout, "nervous"),
+      ...say(state, DIALOGUE.circuit.timeout, "panicking"),
     };
   }
 
@@ -110,7 +110,7 @@ function loseLife(state: GameState, cause: "timeout" | "wall"): GameState {
       termsStage: 0,
       termsRetry: true,
       panic: TERMS.panic.base,
-      ...say(state, DIALOGUE.terms.timeout, "annoyed"),
+      ...say(state, DIALOGUE.terms.timeout, "nervous"),
     };
   }
 
@@ -203,7 +203,7 @@ function enterCircuit(state: GameState): GameState {
     circuitStage: 0,
     circuitRetry: false,
     panic: CIRCUIT.panic.base,
-    ...say(state, DIALOGUE.circuit.intro, "nervous"),
+    ...say(state, DIALOGUE.circuit.intro, "panicking"),
   };
 }
 
@@ -223,7 +223,7 @@ function enterInspection(state: GameState): GameState {
 }
 
 function enterFinal(state: GameState): GameState {
-  return { ...state, screen: "final", panic: 100, emotion: "nervous" };
+  return { ...state, screen: "final", panic: 100, emotion: "panicking" };
 }
 
 function startStory(state: GameState, storyId: NonNullable<GameState["storyId"]>): GameState {
@@ -356,7 +356,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         mazeStage: 1,
         mazeNotice: null,
         panic: MAZE.panic.enter,
-        ...say(state, DIALOGUE.maze.enter, "nervous"),
+        ...say(state, DIALOGUE.maze.enter, "annoyed"),
       };
 
     case "MAZE_EXIT_MOVED":
@@ -365,7 +365,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         mazeStage: 2,
         panic: MAZE.panic.exitMoved,
-        ...say(state, DIALOGUE.maze.exitMoved, "panicking", MOD_NOTICES.exit),
+        ...say(state, DIALOGUE.maze.exitMoved, "nervous", MOD_NOTICES.exit),
       };
 
     case "MAZE_LOCKDOWN":
@@ -374,7 +374,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         mazeStage: 3,
         panic: MAZE.panic.lockdown,
-        ...say(state, DIALOGUE.maze.lockdown, "panicking"),
+        ...say(state, DIALOGUE.maze.lockdown, "nervous"),
       };
 
     case "MAZE_PASSED_GATE":
@@ -383,7 +383,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         mazeStage: 4,
         panic: MAZE.panic.passedGate,
-        ...say(state, DIALOGUE.maze.passedGate, "panicking"),
+        ...say(state, DIALOGUE.maze.passedGate, "nervous"),
       };
 
     case "MAZE_WALL_HIT":
@@ -397,7 +397,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         screen: "mazeCleared",
         score: state.score + MAZE.finishPoints,
         panic: MAZE.panic.finish,
-        ...say(state, DIALOGUE.maze.finish, "panicking"),
+        ...say(state, DIALOGUE.maze.finish, "nervous"),
       };
 
     case "SHOW_MAZE_COMPLETE":
@@ -411,7 +411,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ...state,
           termsStage: 1,
           panic: TERMS.panic.bottom,
-          ...say(state, DIALOGUE.terms.bottom, "panicking"),
+          ...say(state, DIALOGUE.terms.bottom, "nervous"),
         };
       }
       if (state.termsStage === 3) {
@@ -454,7 +454,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         screen: "termsCleared",
         score: state.score + TERMS.finishPoints,
         panic: TERMS.panic.finish,
-        ...say(state, DIALOGUE.terms.complete, "meltdown"),
+        ...say(state, DIALOGUE.terms.complete, "panicking"),
       };
 
     case "SHOW_TERMS_COMPLETE":
@@ -487,7 +487,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...say(
           state,
           pick(DIALOGUE.circuit.sabotage, action.count),
-          action.near ? "panicking" : "annoyed",
+          action.near ? "panicking" : "nervous",
           MOD_NOTICES.circuit,
         ),
       };
@@ -499,7 +499,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         screen: "circuitCleared",
         score: state.score + CIRCUIT.finishPoints,
         panic: CIRCUIT.panic.finish,
-        ...say(state, DIALOGUE.circuit.complete, "meltdown"),
+        ...say(state, DIALOGUE.circuit.complete, "panicking"),
       };
 
     case "SHOW_CIRCUIT_COMPLETE":

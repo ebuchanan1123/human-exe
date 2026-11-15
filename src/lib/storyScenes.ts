@@ -27,7 +27,7 @@ export const STORY: Record<StoryId, readonly StoryLine[]> = {
   afterLevel3: [{ text: "STOP READING THE RULES. THEY'RE NOT FOR READING.", emotion: "panicking" }],
   afterLevel4: [
     { text: "WHO TAUGHT YOU ELECTRICAL ENGINEERING?!", emotion: "panicking" },
-    { text: "YOU'RE CHEATING. I MAKE THE RULES.", emotion: "meltdown" },
+    { text: "YOU'RE CHEATING. I MAKE THE RULES.", emotion: "panicking" },
   ],
 };
 

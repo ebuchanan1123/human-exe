@@ -48,11 +48,11 @@ const QUIPS: Record<"passed" | "skipped", readonly string[]> = {
 };
 
 const EMOTION_BY_ROW: readonly Emotion[] = [
-  "nervous",
-  "nervous",
-  "nervous",
   "panicking",
   "panicking",
+  "panicking",
+  "meltdown",
+  "meltdown",
   "meltdown",
 ];
 
