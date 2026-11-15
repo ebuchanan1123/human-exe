@@ -13,6 +13,7 @@ import {
   TERMS,
 } from "@/lib/gameConfig";
 import type { GameAction, GameState, InspectionChallenge, InspectionStage } from "@/lib/gameTypes";
+import { STORY } from "@/lib/storyScenes";
 
 const INSPECTION_ORDER: Record<InspectionChallenge, number> = { face: 0, smile: 1, mouth: 2 };
 
@@ -32,6 +33,8 @@ export const initialState: GameState = {
   circuitStage: 0,
   circuitRetry: false,
   inspectionStage: 0,
+  storyId: null,
+  mazeSqueezed: false,
   attempt: 0,
   emotion: "smug",
   dialogue: DIALOGUE.start,
@@ -108,6 +111,7 @@ function loseLife(state: GameState, cause: "timeout" | "wall"): GameState {
       attempt: state.attempt + 1,
       mazeStage: 0,
       mazeNotice: cause,
+      mazeSqueezed: false,
       panic: MAZE.panic.base,
       ...say(state, line, "annoyed"),
     };
@@ -128,15 +132,123 @@ function loseLife(state: GameState, cause: "timeout" | "wall"): GameState {
   };
 }
 
+/* Level entry points. Narrative scenes sit in front of these; failures and retries never go through them. */
+
+function enterLevel1(state: GameState, afterIntro: boolean): GameState {
+  return {
+    ...state,
+    screen: "playing",
+    level: 1,
+    attempt: state.attempt + 1,
+    correctCount: 0,
+    timeLeftMs: LEVEL1.timeLimitMs,
+    ...say(state, afterIntro ? STORY.intro[STORY.intro.length - 1].text : DIALOGUE.start, "smug"),
+  };
+}
+
+function enterMaze(state: GameState): GameState {
+  return {
+    ...state,
+    screen: "maze",
+    level: 2,
+    attempt: state.attempt + 1,
+    correctCount: 0,
+    timeLeftMs: MAZE.timeLimitMs,
+    mazeStage: 0,
+    mazeNotice: null,
+    mazeSqueezed: false,
+    panic: MAZE.panic.base,
+    ...say(state, DIALOGUE.maze.intro, "annoyed"),
+  };
+}
+
+function enterTerms(state: GameState): GameState {
+  return {
+    ...state,
+    screen: "terms",
+    level: 3,
+    attempt: state.attempt + 1,
+    timeLeftMs: TERMS.timeLimitMs,
+    termsStage: 0,
+    termsRetry: false,
+    panic: TERMS.panic.base,
+    ...say(state, DIALOGUE.terms.intro, "nervous"),
+  };
+}
+
+function enterCircuit(state: GameState): GameState {
+  return {
+    ...state,
+    screen: "circuit",
+    level: 4,
+    attempt: state.attempt + 1,
+    timeLeftMs: CIRCUIT.timeLimitMs,
+    circuitStage: 0,
+    circuitRetry: false,
+    panic: CIRCUIT.panic.base,
+    ...say(state, DIALOGUE.circuit.intro, "nervous"),
+  };
+}
+
+function enterInspection(state: GameState): GameState {
+  return {
+    ...state,
+    screen: "inspection",
+    level: 5,
+    attempt: state.attempt + 1,
+    timeLeftMs: 0,
+    inspectionStage: 0,
+    panic: INSPECTION.panic.face,
+    ...say(state, DIALOGUE.inspection.intro, "panicking"),
+  };
+}
+
+function enterFinal(state: GameState): GameState {
+  return { ...state, screen: "final", panic: 100, ...say(state, DIALOGUE.final, "meltdown") };
+}
+
+function startStory(state: GameState, storyId: NonNullable<GameState["storyId"]>): GameState {
+  return { ...state, screen: "story", storyId };
+}
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
-    case "START_GAME":
-      return {
+    case "START_GAME": {
+      const fresh: GameState = {
         ...initialState,
-        screen: "playing",
-        attempt: state.attempt + 1,
-        ...say(state, DIALOGUE.start, "smug"),
+        attempt: state.attempt,
+        dialogueId: state.dialogueId,
       };
+      return action.showIntro ? startStory(fresh, "intro") : enterLevel1(fresh, false);
+    }
+
+    case "STORY_DONE": {
+      if (state.screen !== "story" || state.storyId === null) return state;
+      const next = { ...state, storyId: null };
+      switch (state.storyId) {
+        case "intro":
+          return enterLevel1(next, true);
+        case "afterLevel1":
+          return enterMaze(next);
+        case "afterLevel2":
+          return enterTerms(next);
+        case "afterLevel3":
+          return enterCircuit(next);
+        case "afterLevel4":
+          return enterInspection(next);
+        case "ending":
+          return enterFinal(next);
+      }
+      return state;
+    }
+
+    case "CAPTCHA_SWAP":
+      if (state.screen !== "playing") return state;
+      return { ...state, ...say(state, DIALOGUE.swap) };
+
+    case "MAZE_SQUEEZE":
+      if (!isMazeActive(state) || state.mazeSqueezed) return state;
+      return { ...state, mazeSqueezed: true, ...say(state, DIALOGUE.maze.squeeze) };
 
     case "TARGET_HIT": {
       if (state.screen !== "playing" || state.correctCount >= LEVEL1.targetCount) {
@@ -368,79 +480,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "INSPECTION_SKIP":
       if (state.screen !== "inspection" || state.inspectionStage === 3) return state;
-      return {
-        ...state,
-        screen: "final",
-        panic: 100,
-        ...say(state, DIALOGUE.final, "meltdown"),
-      };
+      return startStory(state, "ending");
 
     case "SHOW_INSPECTION_COMPLETE":
       if (state.screen !== "inspectionCleared") return state;
       return { ...state, screen: "inspectionComplete" };
 
     case "CONTINUE":
-      if (state.screen === "levelComplete") {
-        return {
-          ...state,
-          screen: "maze",
-          level: 2,
-          attempt: state.attempt + 1,
-          correctCount: 0,
-          timeLeftMs: MAZE.timeLimitMs,
-          mazeStage: 0,
-          mazeNotice: null,
-          panic: MAZE.panic.base,
-          ...say(state, DIALOGUE.maze.intro, "annoyed"),
-        };
+      switch (state.screen) {
+        case "levelComplete":
+          return startStory(state, "afterLevel1");
+        case "mazeComplete":
+          return startStory(state, "afterLevel2");
+        case "termsComplete":
+          return startStory(state, "afterLevel3");
+        case "circuitComplete":
+          return startStory(state, "afterLevel4");
+        case "inspectionComplete":
+          return startStory(state, "ending");
+        default:
+          return state;
       }
-      if (state.screen === "mazeComplete") {
-        return {
-          ...state,
-          screen: "terms",
-          level: 3,
-          attempt: state.attempt + 1,
-          timeLeftMs: TERMS.timeLimitMs,
-          termsStage: 0,
-          termsRetry: false,
-          panic: TERMS.panic.base,
-          ...say(state, DIALOGUE.terms.intro, "nervous"),
-        };
-      }
-      if (state.screen === "termsComplete") {
-        return {
-          ...state,
-          screen: "circuit",
-          level: 4,
-          attempt: state.attempt + 1,
-          timeLeftMs: CIRCUIT.timeLimitMs,
-          circuitStage: 0,
-          circuitRetry: false,
-          panic: CIRCUIT.panic.base,
-          ...say(state, DIALOGUE.circuit.intro, "nervous"),
-        };
-      }
-      if (state.screen === "circuitComplete") {
-        return {
-          ...state,
-          screen: "inspection",
-          level: 5,
-          attempt: state.attempt + 1,
-          timeLeftMs: 0,
-          inspectionStage: 0,
-          panic: INSPECTION.panic.face,
-          ...say(state, DIALOGUE.inspection.intro, "panicking"),
-        };
-      }
-      if (state.screen === "inspectionComplete") {
-        return {
-          ...state,
-          screen: "final",
-          panic: 100,
-          ...say(state, DIALOGUE.final, "meltdown"),
-        };
-      }
-      return state;
 
     case "QUIT_TO_TITLE":
       return { ...initialState, attempt: state.attempt };
@@ -518,7 +578,13 @@ export function useGameEngine() {
     return () => window.clearTimeout(id);
   }, [screen, inspectionStage]);
 
-  const startGame = useCallback(() => dispatch({ type: "START_GAME" }), []);
+  const startGame = useCallback(
+    (showIntro = true) => dispatch({ type: "START_GAME", showIntro }),
+    [],
+  );
+  const storyDone = useCallback(() => dispatch({ type: "STORY_DONE" }), []);
+  const captchaSwapped = useCallback(() => dispatch({ type: "CAPTCHA_SWAP" }), []);
+  const mazeSqueeze = useCallback(() => dispatch({ type: "MAZE_SQUEEZE" }), []);
   const targetHit = useCallback(() => dispatch({ type: "TARGET_HIT" }), []);
   const wrongPick = useCallback(() => dispatch({ type: "WRONG_PICK" }), []);
   const targetDodged = useCallback(() => dispatch({ type: "TARGET_DODGED" }), []);
@@ -547,6 +613,9 @@ export function useGameEngine() {
   return {
     state,
     startGame,
+    storyDone,
+    captchaSwapped,
+    mazeSqueeze,
     targetHit,
     wrongPick,
     targetDodged,

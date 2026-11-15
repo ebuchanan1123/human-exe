@@ -68,14 +68,53 @@ export function inCell(p: Point, cell: Cell, pad = 0): boolean {
   );
 }
 
+/**
+ * The one narrowing section: the bottom corridor (row 5, cols 3-5). Two jaws
+ * close in from the walls above and below, each up to maxIntrude units, so the
+ * corridor shrinks from 40 to 24 wide and never closes.
+ */
+export const SQUEEZE = {
+  x0: 3 * MAZE_CELL,
+  x1: 6 * MAZE_CELL,
+  yTop: 5 * MAZE_CELL,
+  yBottom: 6 * MAZE_CELL,
+  maxIntrude: 8,
+  /** Walking into this rectangle (the approach from the west) triggers the lockdown. */
+  trigger: { x0: 70, x1: 3 * MAZE_CELL, y0: 5 * MAZE_CELL, y1: 6 * MAZE_CELL },
+} as const;
+
+/** How far each jaw currently intrudes into the corridor, in maze units. */
+export interface SqueezeIntrusion {
+  top: number;
+  bottom: number;
+}
+
+export const NO_SQUEEZE: SqueezeIntrusion = { top: 0, bottom: 0 };
+
+function inSqueezeJaw(p: Point, s: SqueezeIntrusion): boolean {
+  if (p.x < SQUEEZE.x0 || p.x >= SQUEEZE.x1) return false;
+  if (p.y < SQUEEZE.yTop || p.y >= SQUEEZE.yBottom) return false;
+  return p.y < SQUEEZE.yTop + s.top || p.y >= SQUEEZE.yBottom - s.bottom;
+}
+
+export function inSqueezeTrigger(p: Point): boolean {
+  const t = SQUEEZE.trigger;
+  return p.x >= t.x0 && p.x < t.x1 && p.y >= t.y0 && p.y < t.y1;
+}
+
 export function isWalkable(p: Point): boolean {
   if (p.x < 0 || p.y < 0 || p.x >= MAZE_W || p.y >= MAZE_H) return false;
   return charAt(Math.floor(p.x / MAZE_CELL), Math.floor(p.y / MAZE_CELL)) !== "#";
 }
 
 /** Wall or closed/closing security gate. leafProgress is 0 (open) to 1 (closed). */
-export function isBlocked(p: Point, leafProgress: number): boolean {
+export function isBlocked(
+  p: Point,
+  leafProgress: number,
+  squeeze: SqueezeIntrusion = NO_SQUEEZE,
+): boolean {
   if (!isWalkable(p)) return true;
+  if (inSqueezeJaw(p, squeeze)) return true;
   if (leafProgress <= 0) return false;
   const o = cellOrigin(GATE_CELL);
   return (

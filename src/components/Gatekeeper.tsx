@@ -12,6 +12,8 @@ interface GatekeeperProps {
   dialogueId?: number;
   /** Plays a strong one-off recoil, e.g. when the player clears a level. */
   startled?: boolean;
+  /** False when a parent (e.g. DialogueScene) draws its own dialogue window. */
+  showDialogue?: boolean;
   className?: string;
 }
 
@@ -45,6 +47,7 @@ export function Gatekeeper({
   dialogue,
   dialogueId,
   startled = false,
+  showDialogue = true,
   className = "",
 }: GatekeeperProps) {
   const reduceMotion = useReducedMotion();
@@ -76,20 +79,22 @@ export function Gatekeeper({
 
   return (
     <section className={`flex flex-col gap-3 ${className}`} aria-label="The Gatekeeper">
-      <motion.div
-        key={dialogueId ?? dialogue}
-        initial={{ opacity: 0, y: 6, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.18 }}
-        className="speech-bubble bevel-out bg-panel p-1"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="titlebar px-2 py-0.5 font-pixel text-[8px]">GATEKEEPER.EXE</div>
-        <p className="flex min-h-[7.5rem] items-center bg-cream p-2 font-body text-xl leading-tight text-bg">
-          {dialogue}
-        </p>
-      </motion.div>
+      {showDialogue && (
+        <motion.div
+          key={dialogueId ?? dialogue}
+          initial={{ opacity: 0, y: 6, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.18 }}
+          className="speech-bubble bevel-out bg-panel p-1"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="titlebar px-2 py-0.5 font-pixel text-[8px]">GATEKEEPER.EXE</div>
+          <p className="flex min-h-[7.5rem] items-center bg-cream p-2 font-body text-xl leading-tight text-bg">
+            {dialogue}
+          </p>
+        </motion.div>
+      )}
 
       <div
         className="gk-stage bevel-in relative aspect-[2/3] w-full overflow-hidden"

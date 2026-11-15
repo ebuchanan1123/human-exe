@@ -11,17 +11,20 @@ import {
   MAZE_CELL,
   MAZE_H,
   MAZE_W,
+  SQUEEZE,
   START_CELL,
   WALL_CELLS,
   cellCenter,
   cellOrigin,
   inCell,
+  inSqueezeTrigger,
   isBlocked,
 } from "@/lib/mazeGeometry";
 import type { Point } from "@/lib/mazeGeometry";
 
 type Status = "idle" | "active" | "dead" | "won";
 type Lockdown = "none" | "warning" | "live";
+type Squeeze = "none" | "warning" | "closing" | "done";
 
 interface MouseMazeProps {
   /** True once the level is over (win) so the maze ignores input. */
@@ -31,6 +34,7 @@ interface MouseMazeProps {
   onExitMoved: () => void;
   onLockdown: () => void;
   onPassedGate: () => void;
+  onSqueeze: () => void;
   onWallHit: () => void;
   onFinish: () => void;
 }
@@ -47,6 +51,8 @@ const STATUS_TEXT: Record<string, string> = {
   active: "STAY IN THE CORRIDOR. DO NOT TOUCH THE WALLS.",
   warning: "!! SECURITY LOCKDOWN INCOMING !!",
   live: "SECURITY GATE ONLINE. TIME YOUR CROSSING.",
+  squeezeWarning: "!! BUDGET CUTS INCOMING !!",
+  squeezing: "CORRIDOR NARROWING. STAY CENTERED.",
   won: "ACCESS GRANTED?!",
 };
 
@@ -57,6 +63,7 @@ export function MouseMaze({
   onExitMoved,
   onLockdown,
   onPassedGate,
+  onSqueeze,
   onWallHit,
   onFinish,
 }: MouseMazeProps) {
@@ -64,10 +71,13 @@ export function MouseMaze({
   const cursorRef = useRef<SVGGElement>(null);
   const gateRef = useRef<SVGGElement>(null);
   const leafRef = useRef<SVGRectElement>(null);
+  const jawTopRef = useRef<SVGRectElement>(null);
+  const jawBottomRef = useRef<SVGRectElement>(null);
 
   const [status, setStatus] = useState<Status>("idle");
   const [exitIndex, setExitIndex] = useState<0 | 1>(0);
   const [lockdown, setLockdown] = useState<Lockdown>("none");
+  const [squeeze, setSqueeze] = useState<Squeeze>("none");
   const [exitWarning, setExitWarning] = useState(false);
 
   // Transient simulation state lives in a ref so pointer moves never re-render.
@@ -79,6 +89,10 @@ export function MouseMaze({
     lockdownAt: 0,
     liveAt: 0,
     passedGate: false,
+    squeeze: "none" as Squeeze,
+    squeezeAt: 0,
+    jawTop: 0,
+    jawBottom: 0,
     exitWarning: false,
     leaf: 0,
     prev: null as Point | null,
@@ -89,6 +103,7 @@ export function MouseMaze({
     onExitMoved,
     onLockdown,
     onPassedGate,
+    onSqueeze,
     onWallHit,
     onFinish,
   });
@@ -99,6 +114,7 @@ export function MouseMaze({
       onExitMoved,
       onLockdown,
       onPassedGate,
+      onSqueeze,
       onWallHit,
       onFinish,
     };
@@ -113,6 +129,31 @@ export function MouseMaze({
       last = now;
       const s = sim.current;
       if (s.status === "active" && !latest.current.frozen) {
+        if (s.squeeze === "warning" && now >= s.squeezeAt) {
+          s.squeeze = "closing";
+          setSqueeze("closing");
+        }
+        if (s.squeeze === "closing") {
+          // Jaws never advance onto the cursor: each stops a few units short of it.
+          const { maxIntrude, x0, x1, yTop, yBottom } = SQUEEZE;
+          const stepUnits = (dt / MAZE.squeezeCloseMs) * maxIntrude;
+          const near = s.prev !== null && s.prev.x >= x0 - 20 && s.prev.x < x1 + 20;
+          const capTop = near && s.prev ? s.prev.y - yTop - MAZE.squeezeClearance : maxIntrude;
+          const capBottom = near && s.prev ? yBottom - s.prev.y - MAZE.squeezeClearance : maxIntrude;
+          const limitTop = Math.min(maxIntrude, capTop);
+          const limitBottom = Math.min(maxIntrude, capBottom);
+          if (s.jawTop < limitTop) s.jawTop = Math.min(limitTop, s.jawTop + stepUnits);
+          if (s.jawBottom < limitBottom) s.jawBottom = Math.min(limitBottom, s.jawBottom + stepUnits);
+          jawTopRef.current?.setAttribute("height", String(s.jawTop));
+          if (jawBottomRef.current) {
+            jawBottomRef.current.setAttribute("y", String(yBottom - s.jawBottom));
+            jawBottomRef.current.setAttribute("height", String(s.jawBottom));
+          }
+          if (s.jawTop >= maxIntrude && s.jawBottom >= maxIntrude) {
+            s.squeeze = "done";
+            setSqueeze("done");
+          }
+        }
         if (s.lockdown === "warning" && now >= s.lockdownAt) {
           s.lockdown = "live";
           s.liveAt = now;
@@ -172,9 +213,16 @@ export function MouseMaze({
       const t = i / steps;
       const p = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
 
-      if (isBlocked(p, s.leaf)) {
+      if (isBlocked(p, s.leaf, { top: s.jawTop, bottom: s.jawBottom })) {
         fail();
         return;
+      }
+
+      if (s.squeeze === "none" && inSqueezeTrigger(p)) {
+        s.squeeze = "warning";
+        s.squeezeAt = performance.now() + MAZE.squeezeWarnMs;
+        setSqueeze("warning");
+        latest.current.onSqueeze();
       }
 
       if (
@@ -258,7 +306,16 @@ export function MouseMaze({
   const finishOrigin = cellOrigin(finish);
   const oldExitOrigin = cellOrigin(FINISH_CELLS[0]);
   const startOrigin = cellOrigin(START_CELL);
-  const statusKey = status === "active" && lockdown !== "none" ? lockdown : status;
+  const statusKey =
+    status === "active"
+      ? lockdown !== "none"
+        ? lockdown
+        : squeeze === "warning"
+          ? "squeezeWarning"
+          : squeeze === "closing"
+            ? "squeezing"
+            : status
+      : status;
   const showLockdown = lockdown !== "none";
 
   return (
@@ -372,6 +429,62 @@ export function MouseMaze({
                 d={`M${oldExitOrigin.x + 10} ${oldExitOrigin.y + 10} l20 20 M${oldExitOrigin.x + 30} ${oldExitOrigin.y + 10} l-20 20`}
                 stroke="#131D25"
                 strokeWidth="4"
+              />
+            </g>
+          )}
+
+          {/* Shrinking corridor: warning preview, then two jaws close in (geometry mirrors collision) */}
+          {squeeze !== "none" && (
+            <g>
+              {squeeze === "warning" && (
+                <g className="gate-preview">
+                  <rect
+                    x={SQUEEZE.x0}
+                    y={SQUEEZE.yTop}
+                    width={SQUEEZE.x1 - SQUEEZE.x0}
+                    height={SQUEEZE.yBottom - SQUEEZE.yTop}
+                    fill="none"
+                    stroke="#F1A59C"
+                    strokeWidth="2"
+                    strokeDasharray="4 3"
+                  />
+                  <rect
+                    x={SQUEEZE.x0}
+                    y={SQUEEZE.yTop}
+                    width={SQUEEZE.x1 - SQUEEZE.x0}
+                    height={SQUEEZE.maxIntrude}
+                    fill="url(#hazard-pattern)"
+                    opacity="0.7"
+                  />
+                  <rect
+                    x={SQUEEZE.x0}
+                    y={SQUEEZE.yBottom - SQUEEZE.maxIntrude}
+                    width={SQUEEZE.x1 - SQUEEZE.x0}
+                    height={SQUEEZE.maxIntrude}
+                    fill="url(#hazard-pattern)"
+                    opacity="0.7"
+                  />
+                </g>
+              )}
+              <rect
+                ref={jawTopRef}
+                x={SQUEEZE.x0}
+                y={SQUEEZE.yTop}
+                width={SQUEEZE.x1 - SQUEEZE.x0}
+                height="0"
+                fill="url(#hazard-pattern)"
+                stroke="#131D25"
+                strokeWidth="1"
+              />
+              <rect
+                ref={jawBottomRef}
+                x={SQUEEZE.x0}
+                y={SQUEEZE.yBottom}
+                width={SQUEEZE.x1 - SQUEEZE.x0}
+                height="0"
+                fill="url(#hazard-pattern)"
+                stroke="#131D25"
+                strokeWidth="1"
               />
             </g>
           )}
@@ -498,7 +611,7 @@ export function MouseMaze({
 
       <p
         className={`bevel-in px-3 py-2 text-center font-pixel text-[10px] leading-relaxed ${
-          statusKey === "warning"
+          statusKey === "warning" || statusKey === "squeezeWarning"
             ? "animate-pulse-fast bg-danger text-bg"
             : "bg-bg text-cream/80"
         }`}

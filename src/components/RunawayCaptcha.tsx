@@ -31,6 +31,8 @@ interface RunawayCaptchaProps {
   onTargetHit: () => void;
   onWrongPick: () => void;
   onTargetDodged: () => void;
+  /** Fired when the Gatekeeper's hover cheat swaps a target with a decoy. */
+  onTileSwapped: () => void;
 }
 
 const GAP_PX = 8;
@@ -83,24 +85,40 @@ export function RunawayCaptcha({
   onTargetHit,
   onWrongPick,
   onTargetDodged,
+  onTileSwapped,
 }: RunawayCaptchaProps) {
   const [tiles, setTiles] = useState<Tile[]>(createTiles);
   const [popups, setPopups] = useState<Popup[]>([]);
+  /** Target currently hovered long enough to be flagged for "maintenance". */
+  const [warnId, setWarnId] = useState<number | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const tilesRef = useRef<Tile[]>(tiles);
   const dodgeCountRef = useRef(0);
   const lastDodgeRef = useRef(-Infinity);
   const popupIdRef = useRef(0);
-  const latest = useRef({ active, onTargetHit, onWrongPick, onTargetDodged });
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const hoverRef = useRef<{ id: number; timer: number } | null>(null);
+  const swapCountRef = useRef(new Map<number, number>());
+  const lastSwapRef = useRef(-Infinity);
+  /** Until when any tile movement is still animating. */
+  const movingUntilRef = useRef(0);
+  /** Until when a hover swap is still animating; shuffles and dodges wait it out. */
+  const swapUntilRef = useRef(0);
+  const syncHoverRef = useRef<() => void>(() => {});
+  const fireSwapRef = useRef<(id: number) => void>(() => {});
+  const latest = useRef({ active, onTargetHit, onWrongPick, onTargetDodged, onTileSwapped });
 
   useEffect(() => {
-    latest.current = { active, onTargetHit, onWrongPick, onTargetDodged };
+    latest.current = { active, onTargetHit, onWrongPick, onTargetDodged, onTileSwapped };
   });
 
-  const commit = useCallback((next: Tile[]) => {
+  const commit = useCallback((next: Tile[], moved = false) => {
     tilesRef.current = next;
+    if (moved) movingUntilRef.current = performance.now() + LEVEL1.moveSettleMs;
     setTiles(next);
+    // Tiles can move under a stationary pointer, so re-check what is hovered.
+    syncHoverRef.current();
   }, []);
 
   const addPopup = useCallback((slot: number, text: string, positive: boolean) => {
@@ -108,16 +126,135 @@ export function RunawayCaptcha({
     setPopups((prev) => [...prev.slice(-(MAX_POPUPS - 1)), { id, slot, text, positive }]);
   }, []);
 
+  /** The tile under the last known pointer position, using the same slot geometry as rendering. */
+  const tileUnderPointer = useCallback((): Tile | null => {
+    const board = boardRef.current;
+    const p = pointerRef.current;
+    if (!board || !p) return null;
+    const rect = board.getBoundingClientRect();
+    const size = (rect.width - GAP_PX * 2) / 3;
+    const step = size + GAP_PX;
+    const x = p.x - rect.left;
+    const y = p.y - rect.top;
+    const col = Math.floor(x / step);
+    const row = Math.floor(y / step);
+    if (col < 0 || col > 2 || row < 0 || row > 2) return null;
+    if (x - col * step > size || y - row * step > size) return null;
+    return tilesRef.current.find((t) => t.slot === row * 3 + col) ?? null;
+  }, []);
+
+  const clearHover = useCallback(() => {
+    const h = hoverRef.current;
+    if (h) window.clearTimeout(h.timer);
+    hoverRef.current = null;
+    setWarnId(null);
+  }, []);
+
+  const fireSwap = useCallback(
+    (id: number) => {
+      const h = hoverRef.current;
+      if (!h || h.id !== id) return;
+      hoverRef.current = null;
+
+      const current = tilesRef.current;
+      const tile = current.find((t) => t.id === id);
+      const count = swapCountRef.current.get(id) ?? 0;
+      if (
+        !latest.current.active ||
+        !tile ||
+        tile.locked ||
+        count >= LEVEL1.maxSwapsPerTarget ||
+        tileUnderPointer()?.id !== id
+      ) {
+        setWarnId(null);
+        return;
+      }
+
+      // Wait out the global cooldown and any tile still sliding; never stack animations.
+      const now = performance.now();
+      const wait = Math.max(lastSwapRef.current + LEVEL1.swapCooldownMs, movingUntilRef.current) - now;
+      if (wait > 0) {
+        const timer = window.setTimeout(() => fireSwapRef.current(id), wait + 16);
+        hoverRef.current = { id, timer };
+        return;
+      }
+
+      const partners = current.filter((t) => !t.locked && t.kind !== TARGET_KIND);
+      if (partners.length === 0) {
+        setWarnId(null);
+        return;
+      }
+      const partner = partners[Math.floor(Math.random() * partners.length)];
+
+      swapCountRef.current.set(id, count + 1);
+      lastSwapRef.current = now;
+      swapUntilRef.current = now + LEVEL1.moveSettleMs;
+      setWarnId(null);
+      commit(
+        current.map((t) => {
+          if (t.id === tile.id) return { ...t, slot: partner.slot };
+          if (t.id === partner.id) return { ...t, slot: tile.slot };
+          return t;
+        }),
+        true,
+      );
+      latest.current.onTileSwapped();
+    },
+    [commit, tileUnderPointer],
+  );
+
+  /** Starts or cancels the hover timer depending on what the pointer is resting on. */
+  const syncHover = useCallback(() => {
+    const under = latest.current.active ? tileUnderPointer() : null;
+    const eligible =
+      under &&
+      under.kind === TARGET_KIND &&
+      !under.locked &&
+      (swapCountRef.current.get(under.id) ?? 0) < LEVEL1.maxSwapsPerTarget
+        ? under
+        : null;
+    if ((hoverRef.current?.id ?? null) === (eligible?.id ?? null)) return;
+    clearHover();
+    if (!eligible) return;
+    const id = eligible.id;
+    hoverRef.current = {
+      id,
+      timer: window.setTimeout(() => fireSwapRef.current(id), LEVEL1.hoverSwapMs),
+    };
+    setWarnId(id);
+  }, [tileUnderPointer, clearHover]);
+
+  useEffect(() => {
+    fireSwapRef.current = fireSwap;
+  }, [fireSwap]);
+
+  useEffect(() => {
+    syncHoverRef.current = syncHover;
+  }, [syncHover]);
+
+  useEffect(
+    () => () => {
+      const h = hoverRef.current;
+      if (h) window.clearTimeout(h.timer);
+    },
+    [],
+  );
+
   // Periodic shuffle of every unlocked tile among the unlocked slots.
   useEffect(() => {
     if (!active) return;
     let intervalId: number | undefined;
     const shuffle = () => {
+      // A hover swap is mid-slide: skip this tick instead of stacking animations.
+      if (performance.now() < swapUntilRef.current) return;
       const current = tilesRef.current;
       const free = current.filter((t) => !t.locked);
       const slots = shuffled(free.map((t) => t.slot));
       const slotById = new Map(free.map((t, i) => [t.id, slots[i]]));
-      commit(current.map((t) => (t.locked ? t : { ...t, slot: slotById.get(t.id) ?? t.slot })));
+      commit(
+        current.map((t) => (t.locked ? t : { ...t, slot: slotById.get(t.id) ?? t.slot })),
+        true,
+      );
     };
     const startId = window.setTimeout(() => {
       shuffle();
@@ -151,10 +288,14 @@ export function RunawayCaptcha({
   );
 
   const handleBoardPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    pointerRef.current = { x: event.clientX, y: event.clientY };
+    syncHover();
+
     const board = boardRef.current;
     if (!board || !latest.current.active) return;
     if (dodgeCountRef.current >= LEVEL1.maxDodges) return;
     const now = performance.now();
+    if (now < swapUntilRef.current) return;
     if (now - lastDodgeRef.current < LEVEL1.dodgeCooldownMs) return;
 
     const rect = board.getBoundingClientRect();
@@ -191,8 +332,14 @@ export function RunawayCaptcha({
         if (t.id === swapWith.id) return { ...t, slot: threat.slot };
         return t;
       }),
+      true,
     );
     latest.current.onTargetDodged();
+  };
+
+  const handleBoardPointerLeave = () => {
+    pointerRef.current = null;
+    syncHover();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, id: number) => {
@@ -207,6 +354,7 @@ export function RunawayCaptcha({
       ref={boardRef}
       className="relative aspect-square w-full touch-none select-none"
       onPointerMove={handleBoardPointerMove}
+      onPointerLeave={handleBoardPointerLeave}
     >
       {tiles.map((tile) => (
         <button
@@ -230,6 +378,9 @@ export function RunawayCaptcha({
           }`}
         >
           <TileArt kind={tile.kind} />
+          {warnId === tile.id && !tile.locked && (
+            <span className="animate-pulse-fast pointer-events-none absolute inset-0 bg-danger/20 ring-4 ring-inset ring-danger" />
+          )}
           {tile.wrongNonce > 0 && (
             <span
               key={tile.wrongNonce}

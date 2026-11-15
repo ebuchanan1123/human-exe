@@ -16,6 +16,13 @@ export const LEVEL1 = {
   maxDodges: 4,
   /** Pointer distance (in tile widths) from a target's centre that triggers a dodge. */
   dodgeTriggerRadius: 0.85,
+  /** Hover cheat: resting on a target this long makes the Gatekeeper swap it with a decoy. */
+  hoverSwapMs: 500,
+  /** Minimum gap between any two hover swaps. */
+  swapCooldownMs: 1_000,
+  maxSwapsPerTarget: 2,
+  /** Tile slide transition length plus a small margin. */
+  moveSettleMs: 520,
 } as const;
 
 export const MAZE = {
@@ -28,6 +35,11 @@ export const MAZE = {
   approachTriggerRadius: 80,
   /** Delay between the exit moving and the security gate going live. */
   lockdownWarnMs: 1_500,
+  /** Shrinking corridor section: warning, then jaws close once per attempt. */
+  squeezeWarnMs: 1_000,
+  squeezeCloseMs: 1_200,
+  /** Jaws stop this far (maze units) short of the cursor while closing. */
+  squeezeClearance: 3,
   gate: {
     closedMs: 1_000,
     openMs: 1_800,
@@ -159,6 +171,7 @@ export const DIALOGUE = {
     "Hold still! ...Not you. Them.",
   ],
   lowTime: "Tick tock, meatbag.",
+  swap: "Oops! Routine maintenance.",
   timeout: {
     livesLeft2: "As expected.",
     livesLeft1: "One life left. Try not to cry on my keyboard.",
@@ -170,6 +183,7 @@ export const DIALOGUE = {
     enter: "Be careful. Those walls are very expensive.",
     exitMoved: "NOPE. I MOVED IT. THAT'S ALLOWED. I MAKE THE RULES.",
     lockdown: "STOP MOVING SO ACCURATELY.",
+    squeeze: "Budget cuts. We had to reduce corridor width.",
     passedGate: "YOU'RE NOT SUPPOSED TO WIN.",
     finish: "That exit was a clerical error.",
     wallLivesLeft2: "BONK. That wall is company property. You're paying for it.",

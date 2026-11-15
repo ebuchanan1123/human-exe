@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { CircuitBoard } from "@/components/CircuitBoard";
+import { DialogueScene } from "@/components/DialogueScene";
 import { FinalEvaluation } from "@/components/FinalEvaluation";
 import { GameHUD } from "@/components/GameHUD";
 import { GameOver } from "@/components/GameOver";
@@ -16,6 +17,7 @@ import { TitleScreen } from "@/components/TitleScreen";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { LEVEL1 } from "@/lib/gameConfig";
 import type { Screen } from "@/lib/gameTypes";
+import { STORY } from "@/lib/storyScenes";
 
 function screenKey(screen: Screen): string {
   if (screen === "cleared") return "playing";
@@ -64,7 +66,7 @@ export function Game() {
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-3 py-6 sm:px-6">
       <AnimatePresence mode="wait">
         <motion.div
-          key={screenKey(screen)}
+          key={screen === "story" ? `story-${state.storyId}` : screenKey(screen)}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
@@ -74,8 +76,17 @@ export function Game() {
           {screen === "title" && (
             <div className="grid w-full max-w-4xl items-center gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
               {gatekeeper}
-              <TitleScreen onStart={engine.startGame} />
+              <TitleScreen onStart={() => engine.startGame(true)} />
             </div>
+          )}
+
+          {screen === "story" && state.storyId && (
+            <DialogueScene
+              key={state.storyId}
+              lines={STORY[state.storyId]}
+              skipLabel={state.storyId === "intro" ? "SKIP INTRO" : "SKIP DIALOGUE"}
+              onDone={engine.storyDone}
+            />
           )}
 
           {(screen === "playing" || screen === "cleared") && (
@@ -95,6 +106,7 @@ export function Game() {
                       onTargetHit={engine.targetHit}
                       onWrongPick={engine.wrongPick}
                       onTargetDodged={engine.targetDodged}
+                      onTileSwapped={engine.captchaSwapped}
                     />
                     <p className="mt-2 text-center font-pixel text-[10px] text-cream/80">
                       FOUND {state.correctCount}/{LEVEL1.targetCount}
@@ -144,6 +156,7 @@ export function Game() {
                       onExitMoved={engine.mazeExitMoved}
                       onLockdown={engine.mazeLockdown}
                       onPassedGate={engine.mazePassedGate}
+                      onSqueeze={engine.mazeSqueeze}
                       onWallHit={engine.mazeWallHit}
                       onFinish={engine.mazeFinish}
                     />
@@ -324,7 +337,7 @@ export function Game() {
               {gatekeeper}
               <GameOver
                 score={state.score}
-                onRestart={engine.startGame}
+                onRestart={() => engine.startGame(false)}
                 onQuit={engine.quitToTitle}
               />
             </div>

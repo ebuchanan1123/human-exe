@@ -7,6 +7,7 @@ export type Emotion =
 
 export type Screen =
   | "title"
+  | "story"
   | "playing"
   | "cleared"
   | "levelComplete"
@@ -37,6 +38,15 @@ export type TermsStage = 0 | 1 | 2 | 3 | 4;
 export type CircuitStage = 0 | 1 | 2;
 
 export type InspectionChallenge = "face" | "smile" | "mouth";
+
+/** Narrative scenes shown at level transitions; never after a failure or retry. */
+export type StoryId =
+  | "intro"
+  | "afterLevel1"
+  | "afterLevel2"
+  | "afterLevel3"
+  | "afterLevel4"
+  | "ending";
 
 /** Number of inspection challenges passed so far. */
 export type InspectionStage = 0 | 1 | 2 | 3;
@@ -72,6 +82,10 @@ export interface GameState {
   /** True on a fresh Level 4 attempt that follows a timeout. */
   circuitRetry: boolean;
   inspectionStage: InspectionStage;
+  /** Scene currently playing while screen is "story". */
+  storyId: StoryId | null;
+  /** The Level 2 corridor has already narrowed this attempt. */
+  mazeSqueezed: boolean;
   /** Incremented on every fresh minigame attempt; used as a React key to reset it. */
   attempt: number;
   emotion: Emotion;
@@ -81,7 +95,10 @@ export interface GameState {
 }
 
 export type GameAction =
-  | { type: "START_GAME" }
+  | { type: "START_GAME"; showIntro: boolean }
+  | { type: "STORY_DONE" }
+  | { type: "CAPTCHA_SWAP" }
+  | { type: "MAZE_SQUEEZE" }
   | { type: "TARGET_HIT" }
   | { type: "WRONG_PICK" }
   | { type: "TARGET_DODGED" }
