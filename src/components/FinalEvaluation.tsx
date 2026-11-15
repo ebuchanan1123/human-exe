@@ -125,6 +125,9 @@ export function FinalEvaluation({
                 Your humanity exceeds the maximum permitted by this facility. Please return when you
                 are less human.
               </p>
+              <p className="font-body text-xl leading-tight text-mint">
+                (You proved you&apos;re human. He just can&apos;t handle it.)
+              </p>
 
               <dl className="bevel-in grid w-full grid-cols-3 gap-2 bg-bg p-3">
                 <Stat label="SCORE" value={String(score)} />
