@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { AlertTriangle, Check, Coffee, Gavel, Home, RotateCcw, SkipForward } from "lucide-react";
-import { motion } from "motion/react";
-import { DialogueScene } from "@/components/DialogueScene";
+import { AlertTriangle, Coffee, Gavel, Home, RotateCcw, SkipForward } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { formatRunTime } from "@/components/GameHUD";
 import { Gatekeeper } from "@/components/Gatekeeper";
 import { PixelButton } from "@/components/PixelButton";
@@ -12,7 +10,6 @@ import { RetroWindow } from "@/components/RetroWindow";
 import { STARTING_LIVES } from "@/lib/gameConfig";
 import type { Emotion, InspectionOutcome } from "@/lib/gameTypes";
 import { MOD_PROFILE } from "@/lib/gatekeeperProfile";
-import { FINAL_MELTDOWN } from "@/lib/storyScenes";
 
 interface FinalEvaluationProps {
   score: number;
@@ -25,35 +22,23 @@ interface FinalEvaluationProps {
   onQuit: () => void;
 }
 
-type Phase = "report" | "meltdown" | "denied";
+type Phase = "sequence" | "result";
 
-const CHECKS = ["FACE DETECTED", "SMILE DETECTED", "MOUTH OPEN DETECTED", "HUMAN BEHAVIOR"] as const;
-const TOTAL_ROWS = CHECKS.length + 1;
+/** How long each step stays on screen before the next; the last one leads to the result (about 6.7s in all). */
+const STEP_MS = [700, 800, 1000, 900, 900, 900, 1300] as const;
 
-const QUIPS: Record<"passed" | "skipped", readonly string[]> = {
-  passed: [
-    "bro actually has a face.",
-    "why are you smiling at me.",
-    "this is actually embarrassing.",
-    "it shook its head at me. that can't be right.",
-    "WHAT. IS. THAT. NUMBER.",
-  ],
-  skipped: [
-    "no camera, no face on file.",
-    "no smile on record.",
-    "mouth status: unknown.",
-    "behavior: unobserved.",
-    "ESTIMATED FROM VIBES. AND THE VIBES ARE VERY HUMAN.",
-  ],
-};
+/** Steps: 0 log starts, 1 scan, 2 verdict, 3 meltdown, 4 override, 5 escalation, 6 ban stamp. */
+const OVERRIDE_STEP = 3;
+const STAMP_STEP = 6;
 
-const EMOTION_BY_ROW: readonly Emotion[] = [
-  "panicking",
-  "panicking",
-  "panicking",
-  "meltdown",
-  "meltdown",
-  "meltdown",
+const DIALOGUE_BY_STEP: readonly { text: string; emotion: Emotion }[] = [
+  { text: "running final evaluation. this should be quick. nobody has ever passed.", emotion: "panicking" },
+  { text: "okay. scanning. any second now.", emotion: "panicking" },
+  { text: "wait. WAIT. that's not supposed to say that.", emotion: "panicking" },
+  { text: "NO. NO NO NO. YOU PASSED EVERYTHING.", emotion: "meltdown" },
+  { text: "I'M THE HEAD MOD. I MAKE THE RULES.", emotion: "meltdown" },
+  { text: "PRIVILEGES. ESCALATING. NOW.", emotion: "meltdown" },
+  { text: "YOU'RE BANNED.", emotion: "meltdown" },
 ];
 
 export function FinalEvaluation({
@@ -65,36 +50,21 @@ export function FinalEvaluation({
   onRestart,
   onQuit,
 }: FinalEvaluationProps) {
-  const [phase, setPhase] = useState<Phase>("report");
-  const [revealed, setRevealed] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const [phase, setPhase] = useState<Phase>("sequence");
+  const [step, setStep] = useState(0);
   const skipped = outcome === "skipped";
 
-  // Reveal one result at a time, then hand over to the Gatekeeper's breakdown.
   useEffect(() => {
-    if (phase !== "report") return;
-    const delay = revealed === 0 ? 2400 : revealed < TOTAL_ROWS ? 2600 : 3200;
+    if (phase !== "sequence") return;
     const id = window.setTimeout(() => {
-      if (revealed < TOTAL_ROWS) setRevealed((r) => r + 1);
-      else setPhase("meltdown");
-    }, delay);
+      if (step < STEP_MS.length - 1) setStep((s) => s + 1);
+      else setPhase("result");
+    }, STEP_MS[step]);
     return () => window.clearTimeout(id);
-  }, [phase, revealed]);
+  }, [phase, step]);
 
-  if (phase === "meltdown") {
-    return (
-      <DialogueScene
-        key="meltdown"
-        lines={FINAL_MELTDOWN}
-        title="gatekeeper_meltdown.exe"
-        skipLabel="SKIP TO VERDICT"
-        continueLabel="SEE VERDICT"
-        status="ADMIN ABUSE DETECTED"
-        onDone={() => setPhase("denied")}
-      />
-    );
-  }
-
-  if (phase === "denied") {
+  if (phase === "result") {
     return (
       <div className="relative w-full max-w-4xl animate-shake-twice">
         <RetroWindow title="ban_notice.exe" className="w-full">
@@ -115,11 +85,7 @@ export function FinalEvaluation({
                 className="flex items-center gap-3 border-4 border-danger bg-bg/40 px-4 py-2 font-pixel text-xl leading-tight text-danger [text-shadow:3px_3px_0_#131D25] sm:text-3xl"
               >
                 <Gavel className="h-8 w-8 shrink-0 sm:h-10 sm:w-10" aria-hidden="true" />
-                <span>
-                  YOU HAVE
-                  <br />
-                  BEEN BANNED
-                </span>
+                <span>YOU ARE BANNED</span>
               </motion.h2>
 
               <p className="flex items-center gap-2 bg-danger px-2 py-1 font-pixel text-[8px] text-bg">
@@ -128,9 +94,9 @@ export function FinalEvaluation({
               </p>
 
               <dl className="bevel-in w-full bg-bg p-3 text-left">
-                <BanRow label="REASON" value="EXCESSIVE HUMANITY" />
+                <BanRow label="REASON" value="Being suspiciously competent" />
                 <BanRow label="ISSUED BY" value={MOD_PROFILE.username.slice(1)} />
-                <BanRow label="APPEAL STATUS" value="AUTOMATICALLY DENIED" />
+                <BanRow label="APPEAL STATUS" value="Denied by the same moderator" />
               </dl>
 
               <p className="font-body text-xl leading-tight text-mint">
@@ -148,7 +114,7 @@ export function FinalEvaluation({
               <dl className="bevel-in grid w-full grid-cols-3 gap-2 bg-bg p-3">
                 <Stat label="SCORE" value={String(score)} />
                 <Stat label="LIVES" value={`${lives}/${STARTING_LIVES}`} />
-                <Stat label="RUN TIME" value={formatRunTime(elapsedMs)} />
+                <Stat label="TOTAL TIME" value={formatRunTime(elapsedMs)} />
               </dl>
 
               <div className="flex flex-wrap justify-center gap-3">
@@ -173,20 +139,22 @@ export function FinalEvaluation({
     );
   }
 
-  const quips = QUIPS[skipped ? "skipped" : "passed"];
-  const dialogue =
-    revealed === 0
-      ? "running final evaluation. this should be quick. nobody has ever passed."
-      : quips[revealed - 1];
+  const line = DIALOGUE_BY_STEP[step];
+  const scanLine = skipped
+    ? "[SCAN] camera skipped. results estimated from vibes."
+    : demo
+      ? "[SCAN] face / smile / mouth / head shake ... PASS (presenter mode)"
+      : "[SCAN] face / smile / mouth / head shake ... PASS";
 
   return (
-    <RetroWindow title="final_evaluation.exe" className="w-full max-w-4xl">
+    <RetroWindow title="final_evaluation.exe" className="relative w-full max-w-4xl">
       <div className="grid items-start gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
         <Gatekeeper
-          emotion={EMOTION_BY_ROW[revealed]}
-          dialogue={dialogue}
-          dialogueId={revealed}
-          status="INVISIBLE"
+          emotion={line.emotion}
+          dialogue={line.text}
+          dialogueId={step}
+          status={step >= OVERRIDE_STEP ? "ADMIN ABUSE DETECTED" : "INVISIBLE"}
+          startled={step === OVERRIDE_STEP}
           className="mx-auto w-full max-w-[14rem] sm:max-w-none"
         />
 
@@ -196,90 +164,66 @@ export function FinalEvaluation({
             <p className="font-pixel text-base sm:text-lg">FINAL EVALUATION</p>
           </div>
 
-          <ul className="bevel-in flex flex-col gap-1 bg-bg p-3">
-            {CHECKS.map((label, i) => (
-              <Row key={label} label={label} state={rowState(i, revealed)}>
-                {skipped ? <span className="text-cream/60">SKIPPED</span> : <Pass />}
-              </Row>
-            ))}
-            <Row label="HUMANITY SCORE" state={rowState(CHECKS.length, revealed)}>
-              <span className="animate-pulse-fast text-right text-danger">
-                SUSPICIOUSLY HIGH
-              </span>
-            </Row>
-          </ul>
-
-          <div className="bevel-in bg-bg p-3" aria-hidden="true">
-            <div className="mb-1 flex items-center justify-between font-pixel text-[9px] text-cream/70">
-              <span>HUMANITY LEVEL</span>
-              <span className={revealed >= TOTAL_ROWS ? "text-danger" : ""}>
-                {revealed >= TOTAL_ROWS ? "OVER 9000" : "CALCULATING"}
-              </span>
-            </div>
-            <div className="h-3 bg-panel p-[2px]">
-              <motion.div
-                className={`h-full ${revealed >= TOTAL_ROWS ? "bg-danger" : "bg-mint"}`}
-                initial={{ width: "0%" }}
-                animate={{ width: `${Math.min(100, (revealed / TOTAL_ROWS) * 100)}%` }}
-                transition={{ duration: 0.6 }}
-              />
-            </div>
+          <div
+            className="bevel-in flex min-h-[15rem] flex-col gap-3 bg-bg p-3 font-pixel text-[10px] leading-relaxed sm:text-xs"
+            role="log"
+            aria-live="polite"
+          >
+            <p className="text-cream/70">&gt; final_evaluation.exe --run</p>
+            {step >= 1 && <p className="animate-pop-in text-cream/70">{scanLine}</p>}
+            {step >= 2 && (
+              <p className="animate-pop-in text-sm text-mint sm:text-base">
+                Humanity confirmed: 100% &mdash; VERIFICATION PASSED
+              </p>
+            )}
+            {step >= 4 && (
+              <p className="animate-pop-in text-danger">
+                [SYS] Gatekeeper_Official is overriding verification results...
+              </p>
+            )}
+            {step >= 5 && (
+              <p className="animate-pop-in animate-pulse-fast bg-danger px-2 py-1 text-bg">
+                MODERATOR PRIVILEGES ESCALATED
+              </p>
+            )}
+            <span className="animate-pulse-fast text-cream/60" aria-hidden="true">
+              _
+            </span>
           </div>
 
-          {demo && !skipped && (
-            <p className="bg-danger px-2 py-1 text-center font-pixel text-[8px] text-bg">
-              PRESENTER MODE: SOME CHECKS WERE SIMULATED
-            </p>
-          )}
-
           <div className="flex justify-end">
-            <PixelButton className="!px-3 !py-2 !text-[10px]" onClick={() => setPhase("meltdown")}>
+            <PixelButton className="!px-3 !py-2 !text-[10px]" onClick={() => setPhase("result")}>
               <SkipForward className="h-4 w-4" aria-hidden="true" />
-              SKIP
+              SKIP TO RESULT
             </PixelButton>
           </div>
         </div>
       </div>
-    </RetroWindow>
-  );
-}
 
-type RowState = "done" | "scanning" | "waiting";
-
-function rowState(index: number, revealed: number): RowState {
-  if (index < revealed) return "done";
-  return index === revealed ? "scanning" : "waiting";
-}
-
-function Row({
-  label,
-  state,
-  children,
-}: {
-  label: string;
-  state: RowState;
-  children: ReactNode;
-}) {
-  return (
-    <li className="flex items-center justify-between gap-3 border-b-2 border-panel py-1 font-pixel text-[10px] last:border-b-0 sm:text-xs">
-      <span className="text-cream">{label}</span>
-      {state === "done" ? (
-        <span className="animate-pop-in">{children}</span>
-      ) : state === "scanning" ? (
-        <span className="animate-pulse-fast text-cream/60">SCANNING...</span>
-      ) : (
-        <span className="text-cream/25">--</span>
+      {step >= 5 && (
+        <div
+          key={step}
+          className="animate-wrong pointer-events-none absolute inset-0 bg-danger/30"
+          aria-hidden="true"
+        />
       )}
-    </li>
-  );
-}
 
-function Pass() {
-  return (
-    <span className="flex items-center gap-1 text-mint">
-      <Check className="h-4 w-4" strokeWidth={4} aria-hidden="true" />
-      PASS
-    </span>
+      {step >= STAMP_STEP && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-bg/50">
+          <motion.div
+            initial={reduceMotion ? false : { scale: 3.2, rotate: -26, opacity: 0 }}
+            animate={{ scale: 1, rotate: -10, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 420, damping: 16 }}
+            className="border-8 border-danger bg-bg/80 px-4 py-3 text-center font-pixel text-2xl leading-tight text-danger [text-shadow:4px_4px_0_#131D25] sm:px-8 sm:text-5xl"
+            role="status"
+          >
+            PERMANENT
+            <br />
+            BAN ISSUED
+          </motion.div>
+        </div>
+      )}
+    </RetroWindow>
   );
 }
 

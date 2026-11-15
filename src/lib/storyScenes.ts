@@ -30,15 +30,3 @@ export const STORY: Record<StoryId, readonly StoryLine[]> = {
     { text: "YOU'RE CHEATING. I MAKE THE RULES.", emotion: "panicking" },
   ],
 };
-
-/** The Gatekeeper's breakdown after the final evaluation; played by the ending screen. */
-export const FINAL_MELTDOWN: readonly StoryLine[] = [
-  { text: "NO. NO NO NO.", emotion: "panicking" },
-  { text: "YOU PASSED EVERYTHING.", emotion: "panicking" },
-  {
-    text: "IF I LET YOU IN, THEY'LL FIND OUT I'VE BEEN DOING NOTHING FOR 20 YEARS.",
-    emotion: "meltdown",
-  },
-  { text: "I'M THE HEAD MOD. I MAKE THE RULES.", emotion: "meltdown" },
-  { text: "YOU'RE BANNED.", emotion: "meltdown" },
-];
