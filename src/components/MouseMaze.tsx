@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { MAZE } from "@/lib/gameConfig";
 import type { MazeNotice } from "@/lib/gameTypes";
@@ -9,8 +9,12 @@ import {
   FLOOR_CELLS,
   GATE_CELL,
   MAZE_CELL,
+  MAZE_COLS,
   MAZE_H,
+  MAZE_ROWS,
   MAZE_W,
+  NARROW_CELLS,
+  NARROW_INSET,
   SQUEEZE,
   START_CELL,
   WALL_CELLS,
@@ -24,7 +28,7 @@ import type { Point } from "@/lib/mazeGeometry";
 
 type Status = "idle" | "active" | "dead" | "won";
 type Lockdown = "none" | "warning" | "live";
-type Squeeze = "none" | "warning" | "closing" | "done";
+type Squeeze = "none" | "closing" | "done";
 
 interface MouseMazeProps {
   /** True once the level is over (win) so the maze ignores input. */
@@ -44,6 +48,18 @@ const SAMPLE_STEP = 2;
 const GATE_ORIGIN = cellOrigin(GATE_CELL);
 const FIRST_EXIT_CENTER = cellCenter(FINISH_CELLS[0]);
 const GATE_CYCLE_MS = MAZE.gate.closedMs + MAZE.gate.openMs + MAZE.gate.warnMs;
+const CELL_COUNT = MAZE_COLS * MAZE_ROWS;
+const ALL_CELLS = Array.from({ length: CELL_COUNT }, (_, i) => ({
+  col: i % MAZE_COLS,
+  row: Math.floor(i / MAZE_COLS),
+}));
+
+/** Distance from a point to the nearest edge of a cell (0 when inside). */
+function distanceToCell(p: Point, col: number, row: number): number {
+  const dx = Math.max(col * MAZE_CELL - p.x, 0, p.x - (col + 1) * MAZE_CELL);
+  const dy = Math.max(row * MAZE_CELL - p.y, 0, p.y - (row + 1) * MAZE_CELL);
+  return Math.hypot(dx, dy);
+}
 
 const STATUS_TEXT: Record<string, string> = {
   idle: "CLICK THE START ZONE TO BEGIN",
@@ -51,8 +67,6 @@ const STATUS_TEXT: Record<string, string> = {
   active: "STAY IN THE CORRIDOR. DO NOT TOUCH THE WALLS.",
   warning: "!! SECURITY LOCKDOWN INCOMING !!",
   live: "SECURITY GATE ONLINE. TIME YOUR CROSSING.",
-  squeezeWarning: "!! BUDGET CUTS INCOMING !!",
-  squeezing: "CORRIDOR NARROWING. STAY CENTERED.",
   won: "ACCESS GRANTED?!",
 };
 
@@ -73,6 +87,8 @@ export function MouseMaze({
   const leafRef = useRef<SVGRectElement>(null);
   const jawTopRef = useRef<SVGRectElement>(null);
   const jawBottomRef = useRef<SVGRectElement>(null);
+  const fogRef = useRef<SVGGElement>(null);
+  const revealed = useRef(new Uint8Array(CELL_COUNT));
 
   const [status, setStatus] = useState<Status>("idle");
   const [exitIndex, setExitIndex] = useState<0 | 1>(0);
@@ -90,8 +106,8 @@ export function MouseMaze({
     liveAt: 0,
     passedGate: false,
     squeeze: "none" as Squeeze,
-    squeezeAt: 0,
     squeezeElapsed: 0,
+    squeezeReported: false,
     jawTop: 0,
     jawBottom: 0,
     exitWarning: false,
@@ -130,17 +146,13 @@ export function MouseMaze({
       last = now;
       const s = sim.current;
       if (s.status === "active" && !latest.current.frozen) {
-        if (s.squeeze === "warning" && now >= s.squeezeAt) {
-          s.squeeze = "closing";
-          s.squeezeElapsed = 0;
-          setSqueeze("closing");
-        }
         if (s.squeeze === "closing") {
-          // Frame-time accumulation: takes exactly squeezeCloseMs of active play and never jumps after a pause.
+          // Frame-time accumulation, so a pause never makes the jaws jump. Ease-out: they slam, then settle.
           // A jaw never advances onto the cursor: it stops a few units short and resumes once clear.
           const { maxIntrude, x0, x1, yTop, yBottom } = SQUEEZE;
           s.squeezeElapsed += dt;
-          const wanted = Math.min(1, s.squeezeElapsed / MAZE.squeezeCloseMs) * maxIntrude;
+          const t = Math.min(1, s.squeezeElapsed / MAZE.squeezeCloseMs);
+          const wanted = (1 - (1 - t) ** 3) * maxIntrude;
           const near = s.prev !== null && s.prev.x >= x0 - 20 && s.prev.x < x1 + 20;
           const capTop = near && s.prev ? s.prev.y - yTop - MAZE.squeezeClearance : maxIntrude;
           const capBottom = near && s.prev ? yBottom - s.prev.y - MAZE.squeezeClearance : maxIntrude;
@@ -150,6 +162,11 @@ export function MouseMaze({
           if (jawBottomRef.current) {
             jawBottomRef.current.setAttribute("y", String(yBottom - s.jawBottom));
             jawBottomRef.current.setAttribute("height", String(s.jawBottom));
+          }
+          // The Gatekeeper only reacts once the walls have finished moving.
+          if (t >= 1 && !s.squeezeReported) {
+            s.squeezeReported = true;
+            latest.current.onSqueeze();
           }
           if (s.jawTop >= maxIntrude && s.jawBottom >= maxIntrude) {
             s.squeeze = "done";
@@ -198,6 +215,25 @@ export function MouseMaze({
     cursorRef.current?.setAttribute("transform", `translate(${p.x} ${p.y})`);
   };
 
+  /** Lights every cell within the reveal radius of p (or all of them), and keeps them lit. */
+  const reveal = useCallback((p: Point, all = false) => {
+    const fog = fogRef.current;
+    if (!fog) return;
+    const lit = revealed.current;
+    for (let i = 0; i < CELL_COUNT; i++) {
+      if (lit[i]) continue;
+      const { col, row } = ALL_CELLS[i];
+      if (!all && distanceToCell(p, col, row) > MAZE.revealRadius) continue;
+      lit[i] = 1;
+      (fog.children[i] as SVGElement).style.opacity = "0";
+    }
+  }, []);
+
+  // Before START only the area around the start cell is lit.
+  useEffect(() => {
+    reveal(cellCenter(START_CELL));
+  }, [reveal]);
+
   const fail = () => {
     const s = sim.current;
     if (s.status !== "active") return;
@@ -221,10 +257,9 @@ export function MouseMaze({
       }
 
       if (s.squeeze === "none" && inSqueezeTrigger(p)) {
-        s.squeeze = "warning";
-        s.squeezeAt = performance.now() + MAZE.squeezeWarnMs;
-        setSqueeze("warning");
-        latest.current.onSqueeze();
+        s.squeeze = "closing";
+        s.squeezeElapsed = 0;
+        setSqueeze("closing");
       }
 
       if (
@@ -258,6 +293,7 @@ export function MouseMaze({
         s.status = "won";
         s.prev = p;
         setStatus("won");
+        reveal(p, true);
         latest.current.onFinish();
         return;
       }
@@ -265,6 +301,7 @@ export function MouseMaze({
 
     s.prev = to;
     placeCursor(to);
+    reveal(to);
 
     const near =
       !s.exitMoved &&
@@ -308,16 +345,7 @@ export function MouseMaze({
   const finishOrigin = cellOrigin(finish);
   const oldExitOrigin = cellOrigin(FINISH_CELLS[0]);
   const startOrigin = cellOrigin(START_CELL);
-  const statusKey =
-    status === "active"
-      ? lockdown !== "none"
-        ? lockdown
-        : squeeze === "warning"
-          ? "squeezeWarning"
-          : squeeze === "closing"
-            ? "squeezing"
-            : status
-      : status;
+  const statusKey = status === "active" && lockdown !== "none" ? lockdown : status;
   const showLockdown = lockdown !== "none";
 
   return (
@@ -393,6 +421,33 @@ export function MouseMaze({
               fill="url(#floor-pattern)"
             />
           ))}
+          {/* Narrow passages: wall strips drawn over the floor, matching isWalkable */}
+          {NARROW_CELLS.map((c) => {
+            const x = c.col * MAZE_CELL;
+            const y = c.row * MAZE_CELL;
+            const strips =
+              c.axis === "h"
+                ? [
+                    { x, y, w: MAZE_CELL, h: NARROW_INSET },
+                    { x, y: y + MAZE_CELL - NARROW_INSET, w: MAZE_CELL, h: NARROW_INSET },
+                  ]
+                : [
+                    { x, y, w: NARROW_INSET, h: MAZE_CELL },
+                    { x: x + MAZE_CELL - NARROW_INSET, y, w: NARROW_INSET, h: MAZE_CELL },
+                  ];
+            return strips.map((s, i) => (
+              <rect
+                key={`n${c.col}-${c.row}-${i}`}
+                x={s.x}
+                y={s.y}
+                width={s.w}
+                height={s.h}
+                fill="url(#wall-pattern)"
+                stroke="#0b1318"
+                strokeWidth="1"
+              />
+            ));
+          })}
 
           {/* START */}
           <g>
@@ -435,39 +490,9 @@ export function MouseMaze({
             </g>
           )}
 
-          {/* Shrinking corridor: warning preview, then two jaws close in (geometry mirrors collision) */}
+          {/* Shrinking corridor: no warning, two jaws slam in (geometry mirrors collision) */}
           {squeeze !== "none" && (
             <g>
-              {squeeze === "warning" && (
-                <g className="gate-preview">
-                  <rect
-                    x={SQUEEZE.x0}
-                    y={SQUEEZE.yTop}
-                    width={SQUEEZE.x1 - SQUEEZE.x0}
-                    height={SQUEEZE.yBottom - SQUEEZE.yTop}
-                    fill="none"
-                    stroke="#F1A59C"
-                    strokeWidth="2"
-                    strokeDasharray="4 3"
-                  />
-                  <rect
-                    x={SQUEEZE.x0}
-                    y={SQUEEZE.yTop}
-                    width={SQUEEZE.x1 - SQUEEZE.x0}
-                    height={SQUEEZE.maxIntrude}
-                    fill="url(#hazard-pattern)"
-                    opacity="0.7"
-                  />
-                  <rect
-                    x={SQUEEZE.x0}
-                    y={SQUEEZE.yBottom - SQUEEZE.maxIntrude}
-                    width={SQUEEZE.x1 - SQUEEZE.x0}
-                    height={SQUEEZE.maxIntrude}
-                    fill="url(#hazard-pattern)"
-                    opacity="0.7"
-                  />
-                </g>
-              )}
               <rect
                 ref={jawTopRef}
                 x={SQUEEZE.x0}
@@ -475,7 +500,7 @@ export function MouseMaze({
                 width={SQUEEZE.x1 - SQUEEZE.x0}
                 height="0"
                 fill="url(#hazard-pattern)"
-                stroke={squeeze === "closing" ? "#F1A59C" : "#131D25"}
+                stroke="#131D25"
                 strokeWidth="1"
               />
               <rect
@@ -485,7 +510,7 @@ export function MouseMaze({
                 width={SQUEEZE.x1 - SQUEEZE.x0}
                 height="0"
                 fill="url(#hazard-pattern)"
-                stroke={squeeze === "closing" ? "#F1A59C" : "#131D25"}
+                stroke="#131D25"
                 strokeWidth="1"
               />
             </g>
@@ -592,6 +617,21 @@ export function MouseMaze({
               />
             ))}
 
+          {/* Unexplored cells stay dark until the cursor gets close; opacity is set imperatively */}
+          <g ref={fogRef} aria-hidden="true">
+            {ALL_CELLS.map((c) => (
+              <rect
+                key={`fog${c.col}-${c.row}`}
+                x={c.col * MAZE_CELL}
+                y={c.row * MAZE_CELL}
+                width={MAZE_CELL}
+                height={MAZE_CELL}
+                fill="#0b1318"
+                className="maze-fog"
+              />
+            ))}
+          </g>
+
           {/* Glowing cursor marker; position set imperatively */}
           <g
             ref={cursorRef}
@@ -613,7 +653,7 @@ export function MouseMaze({
 
       <p
         className={`bevel-in px-3 py-2 text-center font-pixel text-[10px] leading-relaxed ${
-          statusKey === "warning" || statusKey === "squeezeWarning"
+          statusKey === "warning"
             ? "animate-pulse-fast bg-danger text-bg"
             : "bg-bg text-cream/80"
         }`}

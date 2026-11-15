@@ -110,7 +110,7 @@ export type GameAction =
   | { type: "CAPTCHA_SWAP" }
   | { type: "MAZE_SQUEEZE" }
   | { type: "TARGET_HIT" }
-  | { type: "WRONG_PICK" }
+  | { type: "WRONG_PICK"; tile: string }
   | { type: "TARGET_DODGED" }
   | { type: "TICK"; deltaMs: number }
   | { type: "SHOW_LEVEL_COMPLETE" }

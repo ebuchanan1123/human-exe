@@ -1,12 +1,16 @@
 // Hand-designed maze. S start, A first exit, B relocated exit, G security gate, . corridor, # wall.
+// h/v are corridor cells narrowed by NARROW_INSET on both sides (horizontal / vertical passage).
+// Route: S to A is 40 steps, then A down through the gate G to B (46 in total).
 const LAYOUT = [
-  "###########",
-  "#S...#...A#",
-  "####.#.##.#",
-  "#....#..#G#",
-  "#.####.##.#",
-  "#......##B#",
-  "###########",
+  "###############",
+  "#S..#...#.#..A#",
+  "###.#.#v#.#.#.#",
+  "#...#v#...#.#G#",
+  "#v###.###.#v#.#",
+  "#..hh.#...#v#v#",
+  "#.#####v###.#.#",
+  "#.#####.....#B#",
+  "###############",
 ] as const;
 
 /** Logical units per grid cell; all geometry is in these units, independent of screen size. */
@@ -15,6 +19,9 @@ export const MAZE_COLS = LAYOUT[0].length;
 export const MAZE_ROWS = LAYOUT.length;
 export const MAZE_W = MAZE_COLS * MAZE_CELL;
 export const MAZE_H = MAZE_ROWS * MAZE_CELL;
+
+/** Each side of a narrow cell is walled off this far, leaving a 24-unit passage. */
+export const NARROW_INSET = 8;
 
 export interface Point {
   x: number;
@@ -49,6 +56,9 @@ export const WALL_CELLS: readonly Cell[] = LAYOUT.flatMap((line, row) =>
 export const FLOOR_CELLS: readonly Cell[] = LAYOUT.flatMap((line, row) =>
   [...line].flatMap((ch, col) => (ch !== "#" ? [{ col, row }] : [])),
 );
+export const NARROW_CELLS: readonly (Cell & { axis: "h" | "v" })[] = LAYOUT.flatMap((line, row) =>
+  [...line].flatMap((ch, col) => (ch === "h" || ch === "v" ? [{ col, row, axis: ch }] : [])),
+);
 
 export function cellOrigin(cell: Cell): Point {
   return { x: cell.col * MAZE_CELL, y: cell.row * MAZE_CELL };
@@ -69,18 +79,18 @@ export function inCell(p: Point, cell: Cell, pad = 0): boolean {
 }
 
 /**
- * The one narrowing section: the bottom corridor (row 5, cols 3-5). Two jaws
- * close in from the walls above and below, each up to maxIntrude units, so the
+ * The one narrowing section: the bottom corridor (row 7, cols 8-10). Two jaws
+ * slam in from the walls above and below, each up to maxIntrude units, so the
  * corridor shrinks from 40 to 18 wide (45%) and never closes.
  */
 export const SQUEEZE = {
-  x0: 3 * MAZE_CELL,
-  x1: 6 * MAZE_CELL,
-  yTop: 5 * MAZE_CELL,
-  yBottom: 6 * MAZE_CELL,
+  x0: 8 * MAZE_CELL,
+  x1: 11 * MAZE_CELL,
+  yTop: 7 * MAZE_CELL,
+  yBottom: 8 * MAZE_CELL,
   maxIntrude: 11,
-  /** Walking into this rectangle (the approach from the west) triggers the lockdown. */
-  trigger: { x0: 70, x1: 3 * MAZE_CELL, y0: 5 * MAZE_CELL, y1: 6 * MAZE_CELL },
+  /** Walking into this rectangle (just before the corridor, past the corner) springs the trap. */
+  trigger: { x0: 290, x1: 8 * MAZE_CELL, y0: 7 * MAZE_CELL, y1: 8 * MAZE_CELL },
 } as const;
 
 /** How far each jaw currently intrudes into the corridor, in maze units. */
@@ -104,7 +114,20 @@ export function inSqueezeTrigger(p: Point): boolean {
 
 export function isWalkable(p: Point): boolean {
   if (p.x < 0 || p.y < 0 || p.x >= MAZE_W || p.y >= MAZE_H) return false;
-  return charAt(Math.floor(p.x / MAZE_CELL), Math.floor(p.y / MAZE_CELL)) !== "#";
+  const col = Math.floor(p.x / MAZE_CELL);
+  const row = Math.floor(p.y / MAZE_CELL);
+  const ch = charAt(col, row);
+  if (ch === "#") return false;
+  // Narrow cells keep a centred passage; the rest of the cell is wall.
+  if (ch === "h") {
+    const local = p.y - row * MAZE_CELL;
+    return local >= NARROW_INSET && local < MAZE_CELL - NARROW_INSET;
+  }
+  if (ch === "v") {
+    const local = p.x - col * MAZE_CELL;
+    return local >= NARROW_INSET && local < MAZE_CELL - NARROW_INSET;
+  }
+  return true;
 }
 
 /** Wall or closed/closing security gate. leafProgress is 0 (open) to 1 (closed). */

@@ -6,7 +6,8 @@ export const LEVEL1 = {
   timeLimitMs: 20_000,
   targetCount: 3,
   hitPoints: 100,
-  missPenalty: 25,
+  /** After a wrong pick (which costs a life) every tile ignores input this long. */
+  wrongLockMs: 700,
   lowTimeWarningMs: 5_000,
   /** Delay between the final correct tile and the level-complete screen. */
   clearedDelayMs: 1_100,
@@ -26,18 +27,19 @@ export const LEVEL1 = {
 } as const;
 
 export const MAZE = {
-  timeLimitMs: 25_000,
+  timeLimitMs: 50_000,
   finishPoints: 300,
   clearedDelayMs: 1_500,
+  /** Maze cells light up when the cursor comes this close (maze units) and stay lit. */
+  revealRadius: 100,
   /** Pointer distance (maze units) from the first exit that makes it flicker. */
   approachWarnRadius: 130,
   /** Pointer distance (maze units) from the first exit that makes the Gatekeeper move it. */
   approachTriggerRadius: 80,
   /** Delay between the exit moving and the security gate going live. */
   lockdownWarnMs: 1_500,
-  /** Shrinking corridor section: warning, then jaws close once per attempt. */
-  squeezeWarnMs: 1_000,
-  squeezeCloseMs: 1_000,
+  /** Shrinking corridor: no warning, the jaws slam shut once per attempt. */
+  squeezeCloseMs: 400,
   /** Jaws stop this far (maze units) short of the cursor while closing. */
   squeezeClearance: 3,
   gate: {
@@ -172,71 +174,78 @@ export const EMOTION_BY_HITS: readonly Emotion[] = [
 ];
 
 export const DIALOGUE = {
-  start: "Oh great. Another human.",
-  hits: [
-    "Lucky guess.",
-    "Wait. You're not supposed to be good at this.",
-    "THAT DOESN'T COUNT.",
-  ],
+  start: "oh great. another human.",
+  hits: ["lucky guess.", "okay relax.", "that wasn't supposed to happen."],
+  /** Wrong tile picks; a line naming the tile (wrongNamed) is added to the pool. */
   wrong: [
-    "Nope. Minus points. I love this job.",
-    "Wrong! Did you even look at the pictures?",
-    "Ha! Robots are better at this.",
+    "skill issue.",
+    "did you even look?",
+    "negative aura.",
+    "uninstall your mouse.",
+    "that's embarrassing.",
+    "you're actually cooked.",
   ],
+  wrongNamed: (tile: string) => `bro clicked the ${tile.toUpperCase()}.`,
   dodge: [
-    "Oops. My finger slipped.",
-    "Did that traffic light just move? Weird.",
-    "Hold still! ...Not you. Them.",
+    "oops. my finger slipped.",
+    "that light moved? couldn't be me.",
+    "hold still! ...not you. them.",
+    "get good. catch it.",
   ],
-  lowTime: "Tick tock, meatbag.",
-  swap: "Oops! Routine maintenance.",
+  lowTime: "tick tock, bro.",
+  swap: "oops! routine maintenance. not my problem.",
   timeout: {
-    livesLeft2: "As expected.",
-    livesLeft1: "One life left. Try not to cry on my keyboard.",
+    livesLeft2: "womp womp.",
+    livesLeft1: "one life left. bro is NOT verified.",
   },
-  gameOver: "Human verification FAILED. Goodbye.",
+  gameOver: "bro is NOT verified. goodbye.",
   maze: {
-    intro:
-      "Fine. You passed the first test. Let's see how precise those suspicious little fingers really are.",
-    enter: "Be careful. Those walls are very expensive.",
-    exitMoved: "NOPE. I MOVED IT. THAT'S ALLOWED. I MAKE THE RULES.",
-    lockdown: "STOP MOVING SO ACCURATELY.",
-    squeeze: "Budget cuts. We had to reduce corridor width.",
-    passedGate: "YOU'RE NOT SUPPOSED TO WIN.",
-    finish: "That exit was a clerical error.",
-    wallLivesLeft2: "BONK. That wall is company property. You're paying for it.",
-    wallLivesLeft1: "One life left. Please. Touch more walls.",
-    timeout: "Time's up. The walls remain undefeated.",
+    intro: "fine. you passed the first test. let's see how good your mouse control actually is.",
+    enter: "walk slow. those walls are expensive.",
+    exitMoved: "WAIT. I MOVED THE EXIT. I MAKE THE RULES.",
+    lockdown: "WAIT WAIT WAIT. STOP BEING SO ACCURATE.",
+    /** Said only after the corridor has finished narrowing; there is no warning. */
+    squeezed: ["skill issue tbh.", "bro just walk through it.", "not my problem."],
+    passedGate: "nah this is rigged.",
+    finish: "that exit was a clerical error.",
+    wall: [
+      "skill issue tbh.",
+      "have you tried not touching the wall?",
+      "bro has zero mouse control.",
+      "get good.",
+    ],
+    wallLivesLeft1: "one life left. touch more walls, please.",
+    timeout: "time's up. the walls remain undefeated.",
   },
   terms: {
-    intro: "Nobody reads these. What's wrong with you?",
-    bottom: "WAIT. I haven't finished writing them.",
-    swap: "HA! READ THE BUTTONS NEXT TIME.",
-    clause: "SECURITY POLICY UPDATED.",
-    finalBottom: "STOP SCROLLING. THAT IS A SECURITY INCIDENT.",
-    disagree: "Disagreement noted. And ignored.",
-    timeout: "Time's up. Reading is hard, isn't it?",
+    intro: "nobody reads these. what's wrong with you?",
+    bottom: "WAIT WAIT WAIT. I'm not done writing them.",
+    swap: "HA! skill issue. read the buttons.",
+    clause: "SECURITY POLICY UPDATED. I make the rules.",
+    finalBottom: "STOP SCROLLING. THAT'S A SECURITY INCIDENT.",
+    disagree: "disagreement noted. not my problem.",
+    timeout: "time's up. reading is hard, isn't it?",
     complete: "YOU CAN'T JUST AGREE TO EVERYTHING!",
   },
   circuit: {
-    intro: "You can't brute-force electrical engineering.",
-    progress: "STOP CONNECTING THINGS.",
-    cheat: "Routine security maintenance. Nothing suspicious.",
+    intro: "you can't brute-force electrical engineering.",
+    progress: "STOP COOKING. who let bro near the wiring?",
+    cheat: "i'm literally fixing it for you.",
     sabotage: [
-      "WHOOPS. SECURITY MAINTENANCE.",
-      "That wire looked suspicious.",
-      "STOP FIXING MY CIRCUIT.",
+      "whoops. security maintenance.",
+      "i'm literally fixing it for you.",
+      "nah, rotate that back.",
       "I'M ALLOWED TO TOUCH THE BOARD. YOU'RE NOT.",
     ],
-    timeout: "Power failure. Have you tried plugging yourself in?",
-    complete: "WHO GAVE YOU ACCESS TO THE POWER GRID?!",
+    timeout: "power failure. have you tried plugging yourself in?",
+    complete: "WHO GAVE YOU PERMISSION?! THAT'S THE POWER GRID.",
   },
   inspection: {
     intro: "ENOUGH. I NEED TO SEE YOUR FACE.",
-    face: "Oh, you have a face. How convenient.",
-    smile: "STOP SMILING. THIS IS A GOVERNMENT FACILITY.",
-    mouth: "WHY WOULD YOU ACTUALLY DO THAT?!",
+    face: "oh. you have a face. okay.",
+    smile: "why are you smiling at me?!",
+    mouth: "bro is making faces at his laptop.",
     shake: "DON'T YOU SHAKE YOUR HEAD AT ME!",
-    complete: "YOUR HUMANITY LEVELS ARE OFF THE CHARTS!",
+    complete: "okay that's enough. YOUR HUMANITY LEVELS ARE OFF THE CHARTS!",
   },
 } as const;

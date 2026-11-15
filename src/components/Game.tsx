@@ -166,7 +166,7 @@ export function Game() {
                 {hud}
                 <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
                   {gatekeeper}
-                  <div className="bevel-out relative mx-auto w-full max-w-[36rem] bg-panel p-2">
+                  <div className="bevel-out relative mx-auto w-full max-w-[44rem] bg-panel p-2">
                     <MouseMaze
                       key={state.attempt}
                       frozen={screen !== "maze"}

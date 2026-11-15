@@ -118,7 +118,7 @@ function loseLife(state: GameState, cause: "timeout" | "wall"): GameState {
         ? DIALOGUE.maze.timeout
         : lives === 1
           ? DIALOGUE.maze.wallLivesLeft1
-          : DIALOGUE.maze.wallLivesLeft2;
+          : pick(DIALOGUE.maze.wall, state.dialogueId);
     return {
       ...state,
       lives,
@@ -276,7 +276,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "MAZE_SQUEEZE":
       if (!isMazeActive(state) || state.mazeSqueezed) return state;
-      return { ...state, mazeSqueezed: true, ...say(state, DIALOGUE.maze.squeeze) };
+      return { ...state, mazeSqueezed: true, ...say(state, pick(DIALOGUE.maze.squeezed, state.dialogueId)) };
 
     case "TARGET_HIT": {
       if (state.screen !== "playing" || state.correctCount >= LEVEL1.targetCount) {
@@ -296,10 +296,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "WRONG_PICK":
       if (state.screen !== "playing") return state;
+      // A wrong tile costs exactly one life; the board and earned points carry on.
+      if (state.lives <= 1) return loseLife(state, "timeout");
       return {
         ...state,
-        score: Math.max(0, state.score - LEVEL1.missPenalty),
-        ...say(state, pick(DIALOGUE.wrong, state.dialogueId)),
+        lives: state.lives - 1,
+        ...say(state, pick([...DIALOGUE.wrong, DIALOGUE.wrongNamed(action.tile)], state.dialogueId)),
       };
 
     case "TARGET_DODGED":
@@ -628,7 +630,7 @@ export function useGameEngine() {
   const captchaSwapped = useCallback(() => dispatch({ type: "CAPTCHA_SWAP" }), []);
   const mazeSqueeze = useCallback(() => dispatch({ type: "MAZE_SQUEEZE" }), []);
   const targetHit = useCallback(() => dispatch({ type: "TARGET_HIT" }), []);
-  const wrongPick = useCallback(() => dispatch({ type: "WRONG_PICK" }), []);
+  const wrongPick = useCallback((tile: string) => dispatch({ type: "WRONG_PICK", tile }), []);
   const targetDodged = useCallback(() => dispatch({ type: "TARGET_DODGED" }), []);
   const continueToNext = useCallback(() => dispatch({ type: "CONTINUE" }), []);
   const quitToTitle = useCallback(() => dispatch({ type: "QUIT_TO_TITLE" }), []);

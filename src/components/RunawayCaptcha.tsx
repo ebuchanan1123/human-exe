@@ -29,7 +29,7 @@ interface RunawayCaptchaProps {
   /** False once the level is over (cleared) so the board freezes. */
   active: boolean;
   onTargetHit: () => void;
-  onWrongPick: () => void;
+  onWrongPick: (tile: string) => void;
   onTargetDodged: () => void;
   /** Fired when the Gatekeeper's hover cheat swaps a target with a decoy. */
   onTileSwapped: () => void;
@@ -105,6 +105,8 @@ export function RunawayCaptcha({
   const movingUntilRef = useRef(0);
   /** Until when a hover swap is still animating; shuffles and dodges wait it out. */
   const swapUntilRef = useRef(0);
+  /** After a wrong pick (-1 life) all clicks are ignored until this time, so one mistake costs one life. */
+  const inputLockUntilRef = useRef(0);
   const syncHoverRef = useRef<() => void>(() => {});
   const fireSwapRef = useRef<(id: number) => void>(() => {});
   const latest = useRef({ active, onTargetHit, onWrongPick, onTargetDodged, onTileSwapped });
@@ -270,6 +272,7 @@ export function RunawayCaptcha({
     (id: number) => {
       const { active: isActive, onTargetHit: hit, onWrongPick: wrong } = latest.current;
       if (!isActive) return;
+      if (performance.now() < inputLockUntilRef.current) return;
       const current = tilesRef.current;
       const tile = current.find((t) => t.id === id);
       if (!tile || tile.locked) return;
@@ -279,9 +282,10 @@ export function RunawayCaptcha({
         addPopup(tile.slot, `+${LEVEL1.hitPoints}`, true);
         hit();
       } else {
+        inputLockUntilRef.current = performance.now() + LEVEL1.wrongLockMs;
         commit(current.map((t) => (t.id === id ? { ...t, wrongNonce: t.wrongNonce + 1 } : t)));
-        addPopup(tile.slot, `-${LEVEL1.missPenalty}`, false);
-        wrong();
+        addPopup(tile.slot, "-1 LIFE", false);
+        wrong(KIND_LABEL[tile.kind]);
       }
     },
     [commit, addPopup],
