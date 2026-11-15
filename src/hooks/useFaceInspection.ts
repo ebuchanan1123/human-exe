@@ -62,22 +62,34 @@ function cameraErrorKind(reason: unknown): ScannerErrorKind {
   return "unavailable";
 }
 
+/** Rejects if the model has not finished loading, so a stalled load surfaces as an error instead of an endless wait. */
+const MODEL_LOAD_TIMEOUT_MS = 20_000;
+
 async function loadLandmarker(): Promise<FaceLandmarker> {
   // Imported on demand so MediaPipe never runs during server-side rendering.
   const { FaceLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision");
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
-  const create = (delegate: "GPU" | "CPU") =>
-    FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_URL, delegate },
-      runningMode: "VIDEO",
-      numFaces: 1,
-      outputFaceBlendshapes: true,
-    });
-  try {
-    return await create("GPU");
-  } catch {
-    return await create("CPU");
-  }
+  // CPU only: the GPU delegate can hang forever on some machines instead of failing, and the CPU runs fast enough.
+  const loading = FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
+    runningMode: "VIDEO",
+    numFaces: 1,
+    outputFaceBlendshapes: true,
+  });
+  let timedOut = false;
+  const timeout = new Promise<never>((_, reject) => {
+    window.setTimeout(() => {
+      timedOut = true;
+      reject(new Error("Face model load timed out"));
+    }, MODEL_LOAD_TIMEOUT_MS);
+  });
+  loading.then(
+    (landmarker) => {
+      if (timedOut) landmarker.close();
+    },
+    () => {},
+  );
+  return Promise.race([loading, timeout]);
 }
 
 interface Resources {
@@ -308,6 +320,7 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
       return;
     }
     if (model.status === "rejected") {
+      console.error("Face model failed to load", model.reason);
       camera.value.getTracks().forEach((t) => t.stop());
       fail("model");
       return;
