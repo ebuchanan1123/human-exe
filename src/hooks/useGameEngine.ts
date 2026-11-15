@@ -12,10 +12,23 @@ import {
   STARTING_LIVES,
   TERMS,
 } from "@/lib/gameConfig";
-import type { GameAction, GameState, InspectionChallenge, InspectionStage } from "@/lib/gameTypes";
+import type {
+  GameAction,
+  GameState,
+  InspectionChallenge,
+  InspectionSource,
+  InspectionStage,
+} from "@/lib/gameTypes";
+import { CHALLENGE_ORDER } from "@/lib/faceChallenges";
 import { STORY } from "@/lib/storyScenes";
 
-const INSPECTION_ORDER: Record<InspectionChallenge, number> = { face: 0, smile: 1, mouth: 2 };
+const INSPECTION_ORDER: Record<InspectionChallenge, number> = {
+  face: 0,
+  smile: 1,
+  mouth: 2,
+  shake: 3,
+};
+const INSPECTION_TOTAL = CHALLENGE_ORDER.length;
 
 export const initialState: GameState = {
   screen: "title",
@@ -33,6 +46,8 @@ export const initialState: GameState = {
   circuitStage: 0,
   circuitRetry: false,
   inspectionStage: 0,
+  inspectionOutcome: null,
+  inspectionDemo: false,
   storyId: null,
   mazeSqueezed: false,
   attempt: 0,
@@ -198,13 +213,15 @@ function enterInspection(state: GameState): GameState {
     attempt: state.attempt + 1,
     timeLeftMs: 0,
     inspectionStage: 0,
+    inspectionOutcome: null,
+    inspectionDemo: false,
     panic: INSPECTION.panic.face,
     ...say(state, DIALOGUE.inspection.intro, "panicking"),
   };
 }
 
 function enterFinal(state: GameState): GameState {
-  return { ...state, screen: "final", panic: 100, ...say(state, DIALOGUE.final, "meltdown") };
+  return { ...state, screen: "final", panic: 100, emotion: "nervous" };
 }
 
 function startStory(state: GameState, storyId: NonNullable<GameState["storyId"]>): GameState {
@@ -236,8 +253,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return enterCircuit(next);
         case "afterLevel4":
           return enterInspection(next);
-        case "ending":
-          return enterFinal(next);
       }
       return state;
     }
@@ -459,32 +474,34 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         inspectionStage: (order + 1) as InspectionStage,
+        inspectionDemo: state.inspectionDemo || action.source === "demo",
         panic: INSPECTION.panic[action.challenge],
         ...say(
           state,
           DIALOGUE.inspection[action.challenge],
-          action.challenge === "mouth" ? "meltdown" : "panicking",
+          action.challenge === "face" || action.challenge === "smile" ? "panicking" : "meltdown",
         ),
       };
     }
 
     case "INSPECTION_COMPLETE":
-      if (state.screen !== "inspection" || state.inspectionStage !== 3) return state;
+      if (state.screen !== "inspection" || state.inspectionStage !== INSPECTION_TOTAL) return state;
       return {
         ...state,
         screen: "inspectionCleared",
+        inspectionOutcome: "passed",
         score: state.score + INSPECTION.finishPoints,
         panic: INSPECTION.panic.finish,
         ...say(state, DIALOGUE.inspection.complete, "meltdown"),
       };
 
     case "INSPECTION_SKIP":
-      if (state.screen !== "inspection" || state.inspectionStage === 3) return state;
-      return startStory(state, "ending");
+      if (state.screen !== "inspection" || state.inspectionStage === INSPECTION_TOTAL) return state;
+      return enterFinal({ ...state, inspectionOutcome: "skipped" });
 
     case "SHOW_INSPECTION_COMPLETE":
       if (state.screen !== "inspectionCleared") return state;
-      return { ...state, screen: "inspectionComplete" };
+      return enterFinal(state);
 
     case "CONTINUE":
       switch (state.screen) {
@@ -496,8 +513,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return startStory(state, "afterLevel3");
         case "circuitComplete":
           return startStory(state, "afterLevel4");
-        case "inspectionComplete":
-          return startStory(state, "ending");
         default:
           return state;
       }
@@ -570,7 +585,7 @@ export function useGameEngine() {
 
   // After the last challenge, let the Gatekeeper's reaction land before the completion beat.
   useEffect(() => {
-    if (screen !== "inspection" || inspectionStage < 3) return;
+    if (screen !== "inspection" || inspectionStage < INSPECTION_TOTAL) return;
     const id = window.setTimeout(
       () => dispatch({ type: "INSPECTION_COMPLETE" }),
       INSPECTION.completeDelayMs,
@@ -605,7 +620,8 @@ export function useGameEngine() {
   const circuitCheat = useCallback(() => dispatch({ type: "CIRCUIT_CHEAT" }), []);
   const circuitSolved = useCallback(() => dispatch({ type: "CIRCUIT_SOLVED" }), []);
   const inspectionPass = useCallback(
-    (challenge: InspectionChallenge) => dispatch({ type: "INSPECTION_PASS", challenge }),
+    (challenge: InspectionChallenge, source: InspectionSource) =>
+      dispatch({ type: "INSPECTION_PASS", challenge, source }),
     [],
   );
   const inspectionSkip = useCallback(() => dispatch({ type: "INSPECTION_SKIP" }), []);

@@ -307,27 +307,14 @@ export function Game() {
             </RetroWindow>
           )}
 
-          {screen === "inspectionComplete" && (
-            <div className="grid w-full max-w-4xl items-center gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
-              {gatekeeper}
-              <LevelComplete
-                level={5}
-                score={state.score}
-                lives={state.lives}
-                timeLeftMs={null}
-                elapsedMs={state.elapsedMs}
-                onContinue={engine.continueToNext}
-              />
-            </div>
-          )}
-
           {screen === "final" && (
             <FinalEvaluation
               score={state.score}
+              lives={state.lives}
               elapsedMs={state.elapsedMs}
-              emotion={state.emotion}
-              dialogue={state.dialogue}
-              dialogueId={state.dialogueId}
+              outcome={state.inspectionOutcome}
+              demo={state.inspectionDemo}
+              onRestart={() => engine.startGame(true)}
               onQuit={engine.quitToTitle}
             />
           )}

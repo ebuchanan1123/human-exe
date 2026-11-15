@@ -6,10 +6,10 @@ import { Camera, CameraOff, Check, FlaskConical, ScanFace, SkipForward } from "l
 import { PixelButton } from "@/components/PixelButton";
 import { useFaceInspection } from "@/hooks/useFaceInspection";
 import { CHALLENGE_ORDER, CHALLENGE_TEXT, DEFAULT_DETECTION } from "@/lib/faceChallenges";
-import type { InspectionChallenge } from "@/lib/gameTypes";
+import type { InspectionChallenge, InspectionSource } from "@/lib/gameTypes";
 
 interface HumanInspectionProps {
-  onPass: (challenge: InspectionChallenge) => void;
+  onPass: (challenge: InspectionChallenge, source: InspectionSource) => void;
   /** Leaves the optional level without costing a life. */
   onSkip: () => void;
 }
@@ -75,6 +75,13 @@ export function HumanInspection({ onPass, onSkip }: HumanInspectionProps) {
               SMILE {view.smile.toFixed(2)} / {DEFAULT_DETECTION.smileThreshold.toFixed(2)}
               <br />
               JAW &nbsp;{view.jaw.toFixed(2)} / {DEFAULT_DETECTION.jawThreshold.toFixed(2)}
+              {current === "shake" && (
+                <>
+                  <br />
+                  YAW {view.yaw >= 0 ? "+" : ""}
+                  {view.yaw.toFixed(2)}
+                </>
+              )}
             </div>
             <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 bg-danger px-2 py-1 font-pixel text-[8px] text-bg">
               <span className="animate-pulse-fast">●</span> LIVE
@@ -179,7 +186,7 @@ export function HumanInspection({ onPass, onSkip }: HumanInspectionProps) {
         )}
       </div>
 
-      <ol className="grid grid-cols-3 gap-2" aria-label="Inspection challenges">
+      <ol className="grid grid-cols-4 gap-2" aria-label="Inspection challenges">
         {CHALLENGE_ORDER.map((id, i) => {
           const done = i < stage;
           const active = i === stage && live;

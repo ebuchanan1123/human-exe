@@ -1,51 +1,276 @@
-import { Gavel, Home } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { AlertTriangle, Check, Home, RotateCcw, SkipForward } from "lucide-react";
+import { motion } from "motion/react";
+import { DialogueScene } from "@/components/DialogueScene";
 import { formatRunTime } from "@/components/GameHUD";
 import { Gatekeeper } from "@/components/Gatekeeper";
 import { PixelButton } from "@/components/PixelButton";
 import { RetroWindow } from "@/components/RetroWindow";
-import type { Emotion } from "@/lib/gameTypes";
+import { STARTING_LIVES } from "@/lib/gameConfig";
+import type { Emotion, InspectionOutcome } from "@/lib/gameTypes";
+import { FINAL_MELTDOWN } from "@/lib/storyScenes";
 
 interface FinalEvaluationProps {
   score: number;
+  lives: number;
   elapsedMs: number;
-  emotion: Emotion;
-  dialogue: string;
-  dialogueId: number;
+  outcome: InspectionOutcome | null;
+  /** Some checks were passed in presenter mode rather than by the camera. */
+  demo: boolean;
+  onRestart: () => void;
   onQuit: () => void;
 }
 
+type Phase = "report" | "meltdown" | "denied";
+
+const CHECKS = ["FACE DETECTED", "SMILE DETECTED", "MOUTH OPEN DETECTED", "HUMAN BEHAVIOR"] as const;
+const TOTAL_ROWS = CHECKS.length + 1;
+
+const QUIPS: Record<"passed" | "skipped", readonly string[]> = {
+  passed: [
+    "Hm. A face. Fine.",
+    "A smile. Suspicious.",
+    "...Why would you do that?",
+    "It shook its head at me. That can't be right.",
+    "WHAT. IS. THAT. NUMBER.",
+  ],
+  skipped: [
+    "No camera, no face on file.",
+    "No smile on record.",
+    "Mouth status: unknown.",
+    "Behavior: unobserved.",
+    "ESTIMATED FROM VIBES. AND THE VIBES ARE VERY HUMAN.",
+  ],
+};
+
+const EMOTION_BY_ROW: readonly Emotion[] = [
+  "nervous",
+  "nervous",
+  "nervous",
+  "panicking",
+  "panicking",
+  "meltdown",
+];
+
 export function FinalEvaluation({
   score,
+  lives,
   elapsedMs,
-  emotion,
-  dialogue,
-  dialogueId,
+  outcome,
+  demo,
+  onRestart,
   onQuit,
 }: FinalEvaluationProps) {
+  const [phase, setPhase] = useState<Phase>("report");
+  const [revealed, setRevealed] = useState(0);
+  const skipped = outcome === "skipped";
+
+  // Reveal one result at a time, then hand over to the Gatekeeper's breakdown.
+  useEffect(() => {
+    if (phase !== "report") return;
+    const delay = revealed === 0 ? 1000 : revealed < TOTAL_ROWS ? 850 : 2000;
+    const id = window.setTimeout(() => {
+      if (revealed < TOTAL_ROWS) setRevealed((r) => r + 1);
+      else setPhase("meltdown");
+    }, delay);
+    return () => window.clearTimeout(id);
+  }, [phase, revealed]);
+
+  if (phase === "meltdown") {
+    return (
+      <DialogueScene
+        key="meltdown"
+        lines={FINAL_MELTDOWN}
+        title="gatekeeper_meltdown.exe"
+        skipLabel="SKIP TO VERDICT"
+        continueLabel="SEE VERDICT"
+        onDone={() => setPhase("denied")}
+      />
+    );
+  }
+
+  if (phase === "denied") {
+    return (
+      <div className="relative w-full max-w-4xl animate-shake-twice">
+        <RetroWindow title="access_control.exe" className="w-full">
+          <div className="grid items-center gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
+            <Gatekeeper
+              emotion="meltdown"
+              dialogue="ACCESS DENIED. I'm going to lie down now."
+              dialogueId={99}
+              startled
+              className="mx-auto w-full max-w-[14rem] sm:max-w-none"
+            />
+            <div className="flex flex-col items-center gap-4 text-center">
+              <motion.h2
+                initial={{ scale: 2.6, rotate: -20, opacity: 0 }}
+                animate={{ scale: 1, rotate: -4, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 240, damping: 14 }}
+                className="border-4 border-danger bg-bg/40 px-4 py-2 font-pixel text-2xl leading-tight text-danger [text-shadow:3px_3px_0_#131D25] sm:text-4xl"
+              >
+                ACCESS
+                <br />
+                DENIED
+              </motion.h2>
+
+              <div className="bevel-in w-full bg-bg p-3">
+                <p className="font-pixel text-[10px] text-cream/60">REASON</p>
+                <p className="font-pixel text-base text-danger sm:text-xl">EXCESSIVE HUMANITY</p>
+              </div>
+
+              <p className="font-body text-2xl leading-tight text-cream">
+                Your humanity exceeds the maximum permitted by this facility. Please return when you
+                are less human.
+              </p>
+
+              <dl className="bevel-in grid w-full grid-cols-3 gap-2 bg-bg p-3">
+                <Stat label="SCORE" value={String(score)} />
+                <Stat label="LIVES" value={`${lives}/${STARTING_LIVES}`} />
+                <Stat label="RUN TIME" value={formatRunTime(elapsedMs)} />
+              </dl>
+
+              <div className="flex flex-wrap justify-center gap-3">
+                <PixelButton variant="primary" onClick={onRestart} autoFocus>
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  PLAY AGAIN
+                </PixelButton>
+                <PixelButton onClick={onQuit}>
+                  <Home className="h-4 w-4" aria-hidden="true" />
+                  TITLE
+                </PixelButton>
+              </div>
+              <p className="font-pixel text-[8px] text-cream/50">GATEKEEPER STATUS: ON BREAK. PERMANENTLY.</p>
+            </div>
+          </div>
+        </RetroWindow>
+        <div
+          className="animate-wrong pointer-events-none absolute inset-0 bg-danger/40"
+          aria-hidden="true"
+        />
+      </div>
+    );
+  }
+
+  const quips = QUIPS[skipped ? "skipped" : "passed"];
+  const dialogue =
+    revealed === 0
+      ? "Running final evaluation. This should be quick. Nobody has ever passed."
+      : quips[revealed - 1];
+
   return (
     <RetroWindow title="final_evaluation.exe" className="w-full max-w-4xl">
-      <div className="grid gap-6 sm:grid-cols-[17rem_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
         <Gatekeeper
-          emotion={emotion}
+          emotion={EMOTION_BY_ROW[revealed]}
           dialogue={dialogue}
-          dialogueId={dialogueId}
+          dialogueId={revealed}
           className="mx-auto w-full max-w-[14rem] sm:max-w-none"
         />
-        <div className="flex flex-col items-center justify-center gap-5 text-center">
-          <Gavel className="h-14 w-14 text-danger" aria-hidden="true" />
-          <h2 className="font-pixel text-base text-danger sm:text-xl">FINAL EVALUATION</h2>
-          <p className="font-body text-2xl text-cream">Coming in the next iteration.</p>
-          <p className="font-pixel text-xs leading-relaxed text-cream/70">
-            SCORE SO FAR: {score}
-            <br />
-            RUN TIME: {formatRunTime(elapsedMs)}
-          </p>
-          <PixelButton onClick={onQuit}>
-            <Home className="h-4 w-4" aria-hidden="true" />
-            BACK TO TITLE
-          </PixelButton>
+
+        <div className="flex flex-col gap-3">
+          <div className="bg-mint p-3 text-bg">
+            <p className="font-body text-xl leading-none">Human Inspection Department</p>
+            <p className="font-pixel text-base sm:text-lg">FINAL EVALUATION</p>
+          </div>
+
+          <ul className="bevel-in flex flex-col gap-1 bg-bg p-3">
+            {CHECKS.map((label, i) => (
+              <Row key={label} label={label} state={rowState(i, revealed)}>
+                {skipped ? <span className="text-cream/60">SKIPPED</span> : <Pass />}
+              </Row>
+            ))}
+            <Row label="HUMANITY SCORE" state={rowState(CHECKS.length, revealed)}>
+              <span className="animate-pulse-fast text-right text-danger">
+                SUSPICIOUSLY HIGH
+              </span>
+            </Row>
+          </ul>
+
+          <div className="bevel-in bg-bg p-3" aria-hidden="true">
+            <div className="mb-1 flex items-center justify-between font-pixel text-[9px] text-cream/70">
+              <span>HUMANITY LEVEL</span>
+              <span className={revealed >= TOTAL_ROWS ? "text-danger" : ""}>
+                {revealed >= TOTAL_ROWS ? "OVER 9000" : "CALCULATING"}
+              </span>
+            </div>
+            <div className="h-3 bg-panel p-[2px]">
+              <motion.div
+                className={`h-full ${revealed >= TOTAL_ROWS ? "bg-danger" : "bg-mint"}`}
+                initial={{ width: "0%" }}
+                animate={{ width: `${Math.min(100, (revealed / TOTAL_ROWS) * 100)}%` }}
+                transition={{ duration: 0.6 }}
+              />
+            </div>
+          </div>
+
+          {demo && !skipped && (
+            <p className="bg-danger px-2 py-1 text-center font-pixel text-[8px] text-bg">
+              PRESENTER MODE: SOME CHECKS WERE SIMULATED
+            </p>
+          )}
+
+          <div className="flex justify-end">
+            <PixelButton className="!px-3 !py-2 !text-[10px]" onClick={() => setPhase("meltdown")}>
+              <SkipForward className="h-4 w-4" aria-hidden="true" />
+              SKIP
+            </PixelButton>
+          </div>
         </div>
       </div>
     </RetroWindow>
+  );
+}
+
+type RowState = "done" | "scanning" | "waiting";
+
+function rowState(index: number, revealed: number): RowState {
+  if (index < revealed) return "done";
+  return index === revealed ? "scanning" : "waiting";
+}
+
+function Row({
+  label,
+  state,
+  children,
+}: {
+  label: string;
+  state: RowState;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 border-b-2 border-panel py-1 font-pixel text-[10px] last:border-b-0 sm:text-xs">
+      <span className="text-cream">{label}</span>
+      {state === "done" ? (
+        <span className="animate-pop-in">{children}</span>
+      ) : state === "scanning" ? (
+        <span className="animate-pulse-fast text-cream/60">SCANNING...</span>
+      ) : (
+        <span className="text-cream/25">--</span>
+      )}
+    </li>
+  );
+}
+
+function Pass() {
+  return (
+    <span className="flex items-center gap-1 text-mint">
+      <Check className="h-4 w-4" strokeWidth={4} aria-hidden="true" />
+      PASS
+    </span>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <dt className="font-pixel text-[9px] text-cream/60">{label}</dt>
+      <dd className="flex items-center gap-1 font-pixel text-sm text-cream sm:text-base">
+        {label === "SCORE" && <AlertTriangle className="h-4 w-4 text-mint" aria-hidden="true" />}
+        {value}
+      </dd>
+    </div>
   );
 }

@@ -22,7 +22,6 @@ export type Screen =
   | "circuitComplete"
   | "inspection"
   | "inspectionCleared"
-  | "inspectionComplete"
   | "final"
   | "gameOver";
 
@@ -37,7 +36,7 @@ export type TermsStage = 0 | 1 | 2 | 3 | 4;
 /** 0 untouched, 1 most of the circuit powered, 2 Gatekeeper cheated. */
 export type CircuitStage = 0 | 1 | 2;
 
-export type InspectionChallenge = "face" | "smile" | "mouth";
+export type InspectionChallenge = "face" | "smile" | "mouth" | "shake";
 
 /** Narrative scenes shown at level transitions; never after a failure or retry. */
 export type StoryId =
@@ -45,11 +44,16 @@ export type StoryId =
   | "afterLevel1"
   | "afterLevel2"
   | "afterLevel3"
-  | "afterLevel4"
-  | "ending";
+  | "afterLevel4";
 
 /** Number of inspection challenges passed so far. */
-export type InspectionStage = 0 | 1 | 2 | 3;
+export type InspectionStage = 0 | 1 | 2 | 3 | 4;
+
+/** Where the final evaluation's results come from. */
+export type InspectionOutcome = "passed" | "skipped";
+
+/** Whether a challenge was passed by real detection or by presenter mode. */
+export type InspectionSource = "camera" | "demo";
 
 export type TileKind =
   | "trafficLight"
@@ -82,6 +86,9 @@ export interface GameState {
   /** True on a fresh Level 4 attempt that follows a timeout. */
   circuitRetry: boolean;
   inspectionStage: InspectionStage;
+  inspectionOutcome: InspectionOutcome | null;
+  /** Some inspection steps were passed in presenter mode, not by the camera. */
+  inspectionDemo: boolean;
   /** Scene currently playing while screen is "story". */
   storyId: StoryId | null;
   /** The Level 2 corridor has already narrowed this attempt. */
@@ -121,7 +128,7 @@ export type GameAction =
   | { type: "CIRCUIT_CHEAT" }
   | { type: "CIRCUIT_SOLVED" }
   | { type: "SHOW_CIRCUIT_COMPLETE" }
-  | { type: "INSPECTION_PASS"; challenge: InspectionChallenge }
+  | { type: "INSPECTION_PASS"; challenge: InspectionChallenge; source: InspectionSource }
   | { type: "INSPECTION_COMPLETE" }
   | { type: "INSPECTION_SKIP" }
   | { type: "SHOW_INSPECTION_COMPLETE" }

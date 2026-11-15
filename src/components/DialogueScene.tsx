@@ -15,6 +15,7 @@ interface DialogueSceneProps {
   onDone: () => void;
   skipLabel?: string;
   continueLabel?: string;
+  title?: string;
 }
 
 const MS_PER_CHAR = 26;
@@ -24,6 +25,7 @@ export function DialogueScene({
   onDone,
   skipLabel = "SKIP DIALOGUE",
   continueLabel = "CONTINUE",
+  title = "gatekeeper_briefing.exe",
 }: DialogueSceneProps) {
   const reduceMotion = useReducedMotion();
   const [scene, setScene] = useState({ index: 0, shown: 0 });
@@ -77,7 +79,7 @@ export function DialogueScene({
       transition={{ duration: 0.2 }}
       className="w-full max-w-4xl"
     >
-      <RetroWindow title="gatekeeper_briefing.exe" className="w-full">
+      <RetroWindow title={title} className="w-full">
         <div className="grid items-center gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
           <Gatekeeper
             emotion={line.emotion}

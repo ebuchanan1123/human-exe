@@ -29,10 +29,18 @@ export const STORY: Record<StoryId, readonly StoryLine[]> = {
     { text: "WHO TAUGHT YOU ELECTRICAL ENGINEERING?!", emotion: "panicking" },
     { text: "Fine. I demand to inspect you personally.", emotion: "nervous" },
   ],
-  ending: [
-    {
-      text: "I CAN'T LET YOU IN. THEY'LL FIND OUT I'VE BEEN DOING NOTHING FOR 20 YEARS!",
-      emotion: "meltdown",
-    },
-  ],
 };
+
+/** The Gatekeeper's breakdown after the final evaluation; played by the ending screen. */
+export const FINAL_MELTDOWN: readonly StoryLine[] = [
+  { text: "Humanity score: SUSPICIOUSLY HIGH?! That's not a score. That's a COMPLAINT.", emotion: "panicking" },
+  {
+    text: "You smiled. You gaped. You shook your head at ME. You're a PERFECT human. That's the PROBLEM.",
+    emotion: "panicking",
+  },
+  {
+    text: "I CAN'T LET YOU IN. THEY'LL FIND OUT I'VE BEEN DOING NOTHING FOR 20 YEARS!",
+    emotion: "meltdown",
+  },
+  { text: "...Please don't tell Management.", emotion: "meltdown" },
+];

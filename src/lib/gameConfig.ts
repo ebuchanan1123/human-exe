@@ -104,12 +104,22 @@ export const INSPECTION = {
   maxFrameGapMs: 400,
   /** Ignore detections briefly after a pass so one expression cannot chain-pass stages. */
   passPauseMs: 900,
+  /**
+   * Head shake: the nose offset between the cheeks (as a fraction of face width)
+   * must swing back and forth by `amplitude` for `legs` strokes within `windowMs`.
+   */
+  shake: {
+    amplitude: 0.05,
+    legs: 3,
+    windowMs: 3_000,
+  },
   /** Mouth-corner score floor for each side, relative to the smile threshold. */
   smileSideRatio: 0.5,
   panic: {
     face: 90,
     smile: 95,
     mouth: 98,
+    shake: 99,
     finish: 100,
   },
 } as const;
@@ -190,7 +200,6 @@ export const DIALOGUE = {
     wallLivesLeft1: "One life left. Please. Touch more walls.",
     timeout: "Time's up. The walls remain undefeated.",
   },
-  final: "Fine. One LAST verification.",
   terms: {
     intro: "Nobody reads these. What's wrong with you?",
     bottom: "WAIT. I haven't finished writing them.",
@@ -213,6 +222,7 @@ export const DIALOGUE = {
     face: "Oh, you have a face. How convenient.",
     smile: "STOP SMILING. THIS IS A GOVERNMENT FACILITY.",
     mouth: "WHY WOULD YOU ACTUALLY DO THAT?!",
+    shake: "DON'T YOU SHAKE YOUR HEAD AT ME!",
     complete: "YOUR HUMANITY LEVELS ARE OFF THE CHARTS!",
   },
 } as const;

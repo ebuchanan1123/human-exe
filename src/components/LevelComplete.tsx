@@ -18,7 +18,6 @@ const MESSAGES: Record<number, string> = {
   2: "Perfect precision. The walls are filing a complaint.",
   3: "You agreed to everything. The Gatekeeper is considering legal action.",
   4: "The terminal is online. The Gatekeeper's fuse box is not.",
-  5: "Humanity confirmed. The Gatekeeper would like you to please stop.",
 };
 
 export function LevelComplete({

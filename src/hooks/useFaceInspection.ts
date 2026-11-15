@@ -8,12 +8,15 @@ import {
   CHALLENGE_ORDER,
   conditionMet,
   createHoldState,
+  createShakeState,
+  headYaw,
   readingFromBlendshapes,
   smileScore,
   stepHold,
+  stepShake,
 } from "@/lib/faceChallenges";
-import type { HoldState } from "@/lib/faceChallenges";
-import type { InspectionChallenge } from "@/lib/gameTypes";
+import type { HoldState, ShakeState } from "@/lib/faceChallenges";
+import type { InspectionChallenge, InspectionSource } from "@/lib/gameTypes";
 
 const MODEL_URL = "/models/face_landmarker.task";
 const WASM_URL = "/mediapipe/wasm";
@@ -30,7 +33,9 @@ export interface LiveView {
   faceCount: number;
   smile: number;
   jaw: number;
-  /** 0-1 progress toward the current challenge's hold time. */
+  /** Head turn offset (fraction of face width); 0 facing the camera. */
+  yaw: number;
+  /** 0-1 progress toward the current challenge's hold time or stroke count. */
   progress: number;
 }
 
@@ -39,7 +44,7 @@ export interface PassFlash {
   challenge: InspectionChallenge;
 }
 
-const EMPTY_VIEW: LiveView = { faceCount: 0, smile: 0, jaw: 0, progress: 0 };
+const EMPTY_VIEW: LiveView = { faceCount: 0, smile: 0, jaw: 0, yaw: 0, progress: 0 };
 
 const ERROR_TEXT: Record<ScannerErrorKind, string> = {
   denied: "CAMERA ACCESS WAS BLOCKED. ALLOW THE CAMERA IN YOUR BROWSER, THEN RETRY.",
@@ -83,6 +88,7 @@ interface Resources {
   timer: number | null;
   lastVideoTime: number;
   hold: HoldState;
+  shake: ShakeState;
   /** Challenges passed; mutated synchronously so a pass can never fire twice. */
   stage: number;
   mode: ScannerPhase;
@@ -91,7 +97,7 @@ interface Resources {
 interface Options {
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
-  onPass: (challenge: InspectionChallenge) => void;
+  onPass: (challenge: InspectionChallenge, source: InspectionSource) => void;
 }
 
 export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
@@ -109,6 +115,7 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
     timer: null,
     lastVideoTime: -1,
     hold: createHoldState(),
+    shake: createShakeState(),
     stage: 0,
     mode: "intro",
   });
@@ -152,24 +159,29 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
     [release, setPhase],
   );
 
-  const registerPass = useCallback(() => {
-    const r = res.current;
-    const challenge = CHALLENGE_ORDER[r.stage];
-    if (!challenge) return;
-    r.stage += 1;
-    r.hold = createHoldState();
-    setStage(r.stage);
-    setFlash((f) => ({ id: (f?.id ?? 0) + 1, challenge }));
-    onPassRef.current(challenge);
-    if (r.stage >= CHALLENGE_ORDER.length) {
-      release();
-      setView(EMPTY_VIEW);
-      setPhase("done");
-    }
-  }, [release, setPhase]);
+  const registerPass = useCallback(
+    (source: InspectionSource) => {
+      const r = res.current;
+      const challenge = CHALLENGE_ORDER[r.stage];
+      if (!challenge) return;
+      r.stage += 1;
+      r.hold = createHoldState();
+      r.shake = createShakeState();
+      setStage(r.stage);
+      setView((v) => ({ ...v, progress: 0 }));
+      setFlash((f) => ({ id: (f?.id ?? 0) + 1, challenge }));
+      onPassRef.current(challenge, source);
+      if (r.stage >= CHALLENGE_ORDER.length) {
+        release();
+        setView(EMPTY_VIEW);
+        setPhase("done");
+      }
+    },
+    [release, setPhase],
+  );
 
   const drawOverlay = useCallback(
-    (video: HTMLVideoElement, result: FaceLandmarkerResult) => {
+    (video: HTMLVideoElement, result: FaceLandmarkerResult, showYaw: boolean) => {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
@@ -234,6 +246,21 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
       ctx.fillStyle = "#A8F0BB";
       ctx.font = `${Math.max(10, Math.round(w / 45))}px "Press Start 2P", monospace`;
       ctx.fillText("FACE LOCK", left, Math.max(14, top - 8));
+
+      // Head-turn gauge for the shake challenge: nose dot against the face-edge line.
+      const nose = landmarks[1];
+      const edgeA = landmarks[234];
+      const edgeB = landmarks[454];
+      if (showYaw && nose && edgeA && edgeB) {
+        ctx.strokeStyle = "#E1E5D6";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo((1 - edgeA.x) * w, ((edgeA.y + edgeB.y) / 2) * h);
+        ctx.lineTo((1 - edgeB.x) * w, ((edgeA.y + edgeB.y) / 2) * h);
+        ctx.stroke();
+        ctx.fillStyle = "#F1A59C";
+        ctx.fillRect((1 - nose.x) * w - 4, nose.y * h - 4, 8, 8);
+      }
     },
     [canvasRef],
   );
@@ -245,6 +272,7 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
     const session = r.session;
     r.stage = 0;
     r.hold = createHoldState();
+    r.shake = createShakeState();
     r.lastVideoTime = -1;
     setStage(0);
     setError(null);
@@ -326,19 +354,32 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
 
       const faceCount = result.faceLandmarks.length;
       const reading = readingFromBlendshapes(faceCount, result.faceBlendshapes[0]?.categories ?? []);
-      drawOverlay(video, result);
-
       const challenge = CHALLENGE_ORDER[r.stage];
+      drawOverlay(video, result, challenge === "shake");
+
       if (!challenge) return;
-      const step = stepHold(r.hold, conditionMet(challenge, reading), now);
-      r.hold = step.state;
+      const yaw = faceCount > 0 ? headYaw(result.faceLandmarks[0]) : null;
+      let progress: number;
+      let passed: boolean;
+      if (challenge === "shake") {
+        const step = stepShake(r.shake, yaw, now);
+        r.shake = step.state;
+        progress = step.progress;
+        passed = step.passed;
+      } else {
+        const step = stepHold(r.hold, conditionMet(challenge, reading), now);
+        r.hold = step.state;
+        progress = step.progress;
+        passed = step.passed;
+      }
       setView({
         faceCount,
         smile: smileScore(reading),
         jaw: reading.jawOpen,
-        progress: step.progress,
+        yaw: yaw ?? 0,
+        progress,
       });
-      if (step.passed) registerPass();
+      if (passed) registerPass("camera");
     };
 
     r.timer = window.setInterval(tick, INSPECTION.detectionIntervalMs);
@@ -359,7 +400,7 @@ export function useFaceInspection({ videoRef, canvasRef, onPass }: Options) {
 
   const demoPass = useCallback(() => {
     if (res.current.mode !== "demo") return;
-    registerPass();
+    registerPass("demo");
   }, [registerPass]);
 
   // Stop everything when the level ends or the component unmounts.

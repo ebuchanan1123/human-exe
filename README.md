@@ -9,14 +9,14 @@ A comedic browser game made for a one-day Stupid Ideas Hackathon. Survive increa
 - Title screen, HUD (lives, level, countdown, score, run time, Gatekeeper panic meter)
 - **Level 1: Runaway CAPTCHA** - find the three traffic lights in 20 seconds while tiles shuffle and the targets try to dodge your cursor
 - **Level 2: The Gatekeeper's Impossible Maze** - click START, then steer the cursor through a hand-built corridor to FINISH within 25 seconds. Touching a wall costs a life. When you near the exit the Gatekeeper moves it (once per attempt), then brings a security gate online.
-- Gatekeeper placeholder with emotions (`smug`, `annoyed`, `nervous`, `panicking`, `meltdown`) and dialogue driven by real gameplay events
-- Level complete screens, game over, restart, and a Final Evaluation placeholder
+- Gatekeeper with emotions (`smug`, `annoyed`, `nervous`, `panicking`, `meltdown`) and dialogue driven by real gameplay events
+- Level complete screens, game over, restart, and a complete ending: a Final Evaluation report, the Gatekeeper's meltdown, and an ACCESS DENIED verdict (reason: Excessive Humanity)
 
-Not yet built: the Final Evaluation itself and the ACCESS DENIED ending.
+All five levels and the ending are playable.
 
 ### Level 5: The Human Inspection Department (webcam)
 
-Uses MediaPipe Face Landmarker in the browser: face, smile and open-mouth checks, each held for 700 ms. Video never leaves the browser. The camera needs a deliberate click, plus HTTPS or `localhost`. If it is denied or unavailable you can retry, use a clearly labelled presenter mode (no computer vision), or skip the level at no cost. The model is in `public/models/`; `npm install` copies the WASM runtime into `public/mediapipe/` (see `scripts/copy-mediapipe.mjs`). Detection thresholds live in `INSPECTION` in `src/lib/gameConfig.ts`.
+Uses MediaPipe Face Landmarker in the browser: face, smile and open-mouth checks (each held for 700 ms), then a head shake ("no"), measured as the nose swinging left and right between the face edges. Video never leaves the browser. The camera needs a deliberate click, plus HTTPS or `localhost`. If it is denied or unavailable you can retry, use a clearly labelled presenter mode (no computer vision), or skip the level at no cost. The model is in `public/models/`; `npm install` copies the WASM runtime into `public/mediapipe/` (see `scripts/copy-mediapipe.mjs`). Detection thresholds live in `INSPECTION` in `src/lib/gameConfig.ts`.
 
 ## Getting started
 
