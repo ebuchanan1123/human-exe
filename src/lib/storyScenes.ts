@@ -8,15 +8,17 @@ export interface StoryLine {
 
 export const STORY: Record<StoryId, readonly StoryLine[]> = {
   intro: [
-    { text: "HALT! Who goes there? Another one of you fleshy keyboard enthusiasts?", emotion: "annoyed" },
+    { text: "WHO KEEPS CLICKING MY CHECKBOX?!", emotion: "panicking" },
+    { text: "You think checking a little square proves you're human?", emotion: "annoyed" },
     {
       text: "I am the Gatekeeper. Senior Human Verification Officer. Employee of the month for 243 consecutive months.",
       emotion: "smug",
     },
     {
-      text: "Nobody has ever passed my security tests. Not a single person. And I intend to keep it that way.",
+      text: "I've spent 20 years perfecting this system. Nobody has ever passed my security tests. Not a single person.",
       emotion: "smug",
     },
+    { text: "Let's see how human you REALLY are.", emotion: "smug" },
     {
       text: "Now, select all images containing traffic lights. Try not to embarrass yourself.",
       emotion: "smug",

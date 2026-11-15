@@ -23,7 +23,7 @@ export function GameOver({ score, onRestart, onQuit }: GameOverProps) {
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
             RESTART
           </PixelButton>
-          <PixelButton onClick={onQuit}>TITLE</PixelButton>
+          <PixelButton onClick={onQuit}>BACK TO WEBSITE</PixelButton>
         </div>
       </div>
     </RetroWindow>

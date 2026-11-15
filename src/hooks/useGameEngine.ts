@@ -31,7 +31,7 @@ const INSPECTION_ORDER: Record<InspectionChallenge, number> = {
 const INSPECTION_TOTAL = CHALLENGE_ORDER.length;
 
 export const initialState: GameState = {
-  screen: "title",
+  screen: "landing",
   level: 1,
   lives: STARTING_LIVES,
   score: 0,
@@ -238,6 +238,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
       return action.showIntro ? startStory(fresh, "intro") : enterLevel1(fresh, false);
     }
+
+    case "LANDING_DONE": {
+      // The fake website hands over to the Gatekeeper's intro; no timers run until Level 1.
+      if (state.screen !== "landing") return state;
+      return startStory(
+        { ...initialState, attempt: state.attempt, dialogueId: state.dialogueId },
+        "intro",
+      );
+    }
+
+    case "SKIP_LANDING":
+      if (state.screen !== "landing") return state;
+      return { ...state, screen: "title" };
 
     case "STORY_DONE": {
       if (state.screen !== "story" || state.storyId === null) return state;
@@ -598,6 +611,8 @@ export function useGameEngine() {
     [],
   );
   const storyDone = useCallback(() => dispatch({ type: "STORY_DONE" }), []);
+  const landingDone = useCallback(() => dispatch({ type: "LANDING_DONE" }), []);
+  const skipLanding = useCallback(() => dispatch({ type: "SKIP_LANDING" }), []);
   const captchaSwapped = useCallback(() => dispatch({ type: "CAPTCHA_SWAP" }), []);
   const mazeSqueeze = useCallback(() => dispatch({ type: "MAZE_SQUEEZE" }), []);
   const targetHit = useCallback(() => dispatch({ type: "TARGET_HIT" }), []);
@@ -630,6 +645,8 @@ export function useGameEngine() {
     state,
     startGame,
     storyDone,
+    landingDone,
+    skipLanding,
     captchaSwapped,
     mazeSqueeze,
     targetHit,

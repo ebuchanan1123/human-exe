@@ -6,7 +6,8 @@ A comedic browser game made for a one-day Stupid Ideas Hackathon. Survive increa
 
 ## Current state
 
-- Title screen, HUD (lives, level, countdown, score, run time, Gatekeeper panic meter)
+- **The opening**: the site starts as a believable fictional coffee shop page ("The Daily Bean") with an "I'm not a robot" checkbox. Ticking it glitches the page, shows a SECURITY VERIFICATION FAILED popup, then launches GATEKEEPER.EXE into the Gatekeeper's intro and Level 1. It lives in `src/components/landing/`; the page asks for no permissions and has no external links. Respects `prefers-reduced-motion`. In development only, open `/?skip=landing` to jump past it to the old title screen.
+- Title screen (dev entry only), HUD (lives, level, countdown, score, run time, Gatekeeper panic meter)
 - **Level 1: Runaway CAPTCHA** - find the three traffic lights in 20 seconds while tiles shuffle and the targets try to dodge your cursor
 - **Level 2: The Gatekeeper's Impossible Maze** - click START, then steer the cursor through a hand-built corridor to FINISH within 25 seconds. Touching a wall costs a life. When you near the exit the Gatekeeper moves it (once per attempt), then brings a security gate online.
 - Gatekeeper with emotions (`smug`, `annoyed`, `nervous`, `panicking`, `meltdown`) and dialogue driven by real gameplay events

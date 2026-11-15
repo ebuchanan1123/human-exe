@@ -9,6 +9,16 @@
 
   --font-pixel: var(--font-pixel-src), monospace;
   --font-body: var(--font-body-src), monospace;
+  --font-site-serif: var(--font-site-serif-src), Georgia, serif;
+  --font-site-sans: var(--font-site-sans-src), system-ui, sans-serif;
+
+  /* The Daily Bean (fake coffee shop site) */
+  --color-bean-cream: #fbf6ec;
+  --color-bean-latte: #efe3cf;
+  --color-bean-green: #1f4d3a;
+  --color-bean-green-dark: #163a2b;
+  --color-bean-brown: #4a3220;
+  --color-bean-clay: #b85c38;
 
   --animate-wrong: wrong-flash 0.6s ease-out forwards;
   --animate-lock: lock-pop 0.35s ease-out;
@@ -474,5 +484,109 @@ body {
   .scanner-bar {
     animation: none;
     display: none;
+  }
+}
+
+/* Fake coffee shop landing: verification widget and the glitch that follows */
+.captcha-spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #d6d6d6;
+  border-top-color: var(--color-bean-green);
+  border-radius: 50%;
+  animation: captcha-spin 0.7s linear infinite;
+}
+
+@keyframes captcha-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Small position shifts only: no brightness flashing. */
+.site-glitch-soft {
+  animation: site-glitch-soft 0.65s steps(6) 1;
+}
+
+@keyframes site-glitch-soft {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-1px, 0);
+  }
+  40% {
+    transform: translate(2px, 1px);
+  }
+  60% {
+    transform: translate(-2px, 0) skewX(0.4deg);
+  }
+  80% {
+    transform: translate(1px, -1px);
+  }
+}
+
+.site-glitch-hard {
+  animation: site-glitch-hard 0.8s steps(7) 1;
+}
+
+@keyframes site-glitch-hard {
+  0% {
+    transform: translate(0, 0);
+  }
+  15% {
+    transform: translate(-8px, 0) skewX(1.5deg);
+  }
+  30% {
+    transform: translate(10px, 2px) skewX(-2deg);
+  }
+  45% {
+    transform: translate(-6px, -2px);
+  }
+  60% {
+    transform: translate(12px, 0) skewX(1.8deg);
+  }
+  75% {
+    transform: translate(-10px, 1px) skewX(-1deg);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.site-corrupt {
+  filter: saturate(0.5) hue-rotate(-14deg);
+}
+
+.landing-bars span {
+  position: absolute;
+  inset-inline: 0;
+  background: rgba(168, 240, 187, 0.22);
+  animation: landing-bar 0.8s steps(7) infinite;
+}
+
+.landing-bars span:nth-child(even) {
+  background: rgba(241, 165, 156, 0.22);
+  animation-delay: -0.4s;
+}
+
+@keyframes landing-bar {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(24px);
+  }
+  100% {
+    transform: translateX(-16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .captcha-spinner,
+  .site-glitch-soft,
+  .site-glitch-hard {
+    animation: none;
   }
 }

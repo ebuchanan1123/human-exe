@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, Check, Home, RotateCcw, SkipForward } from "lucide-react";
+import { AlertTriangle, Check, Coffee, Home, RotateCcw, SkipForward } from "lucide-react";
 import { motion } from "motion/react";
 import { DialogueScene } from "@/components/DialogueScene";
 import { formatRunTime } from "@/components/GameHUD";
@@ -129,6 +129,14 @@ export function FinalEvaluation({
                 (You proved you&apos;re human. He just can&apos;t handle it.)
               </p>
 
+              <div className="w-full rounded-md border border-[#d9c9ad] bg-bean-cream px-4 py-3 text-left font-site-sans text-sm text-bean-brown">
+                <p className="flex items-center gap-2 font-site-serif font-semibold text-bean-green">
+                  <Coffee className="h-4 w-4" aria-hidden="true" />
+                  The Daily Bean
+                </p>
+                <p className="mt-1">Sorry! You must verify you&apos;re human to view our menu.</p>
+              </div>
+
               <dl className="bevel-in grid w-full grid-cols-3 gap-2 bg-bg p-3">
                 <Stat label="SCORE" value={String(score)} />
                 <Stat label="LIVES" value={`${lives}/${STARTING_LIVES}`} />
@@ -142,7 +150,7 @@ export function FinalEvaluation({
                 </PixelButton>
                 <PixelButton onClick={onQuit}>
                   <Home className="h-4 w-4" aria-hidden="true" />
-                  TITLE
+                  BACK TO WEBSITE
                 </PixelButton>
               </div>
               <p className="font-pixel text-[8px] text-cream/50">GATEKEEPER STATUS: ON BREAK. PERMANENTLY.</p>

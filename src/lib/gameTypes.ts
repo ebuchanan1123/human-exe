@@ -6,6 +6,7 @@ export type Emotion =
   | "meltdown";
 
 export type Screen =
+  | "landing"
   | "title"
   | "story"
   | "playing"
@@ -103,6 +104,8 @@ export interface GameState {
 
 export type GameAction =
   | { type: "START_GAME"; showIntro: boolean }
+  | { type: "LANDING_DONE" }
+  | { type: "SKIP_LANDING" }
   | { type: "STORY_DONE" }
   | { type: "CAPTCHA_SWAP" }
   | { type: "MAZE_SQUEEZE" }

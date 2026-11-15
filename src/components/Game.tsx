@@ -1,7 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { useEffect } from "react";
 import { CircuitBoard } from "@/components/CircuitBoard";
+import { CoffeeShopLanding } from "@/components/landing/CoffeeShopLanding";
 import { DialogueScene } from "@/components/DialogueScene";
 import { FinalEvaluation } from "@/components/FinalEvaluation";
 import { GameHUD } from "@/components/GameHUD";
@@ -32,6 +34,19 @@ export function Game() {
   const engine = useGameEngine();
   const { state } = engine;
   const { screen } = state;
+  const { skipLanding } = engine;
+
+  // The tab only says CAPTCHA HELL once the fake website has handed over to the game.
+  useEffect(() => {
+    document.title =
+      screen === "landing" ? "The Daily Bean | A little coffee. A better day." : "CAPTCHA HELL";
+  }, [screen]);
+
+  // Development-only shortcut: /?skip=landing jumps past the fake website to the title screen.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (new URLSearchParams(window.location.search).get("skip") === "landing") skipLanding();
+  }, [skipLanding]);
 
   const gatekeeper = (
     <Gatekeeper
@@ -61,6 +76,10 @@ export function Game() {
       panic={state.panic}
     />
   );
+
+  if (screen === "landing") {
+    return <CoffeeShopLanding onLaunch={engine.landingDone} />;
+  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-3 py-6 sm:px-6">
