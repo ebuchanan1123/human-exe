@@ -8,6 +8,7 @@ import {
   INSPECTION,
   LEVEL1,
   MAZE,
+  MOD_NOTICES,
   PANIC_BY_HITS,
   STARTING_LIVES,
   TERMS,
@@ -20,7 +21,6 @@ import type {
   InspectionStage,
 } from "@/lib/gameTypes";
 import { CHALLENGE_ORDER } from "@/lib/faceChallenges";
-import { STORY } from "@/lib/storyScenes";
 
 const INSPECTION_ORDER: Record<InspectionChallenge, number> = {
   face: 0,
@@ -53,6 +53,7 @@ export const initialState: GameState = {
   attempt: 0,
   emotion: "smug",
   dialogue: DIALOGUE.start,
+  modNotice: null,
   dialogueId: 0,
 };
 
@@ -60,8 +61,9 @@ function say(
   state: GameState,
   dialogue: string,
   emotion: GameState["emotion"] = state.emotion,
-): Pick<GameState, "dialogue" | "dialogueId" | "emotion"> {
-  return { dialogue, emotion, dialogueId: state.dialogueId + 1 };
+  modNotice: string | null = null,
+): Pick<GameState, "dialogue" | "dialogueId" | "emotion" | "modNotice"> {
+  return { dialogue, emotion, modNotice, dialogueId: state.dialogueId + 1 };
 }
 
 function pick(lines: readonly string[], index: number): string {
@@ -149,7 +151,7 @@ function loseLife(state: GameState, cause: "timeout" | "wall"): GameState {
 
 /* Level entry points. Narrative scenes sit in front of these; failures and retries never go through them. */
 
-function enterLevel1(state: GameState, afterIntro: boolean): GameState {
+function enterLevel1(state: GameState): GameState {
   return {
     ...state,
     screen: "playing",
@@ -157,7 +159,7 @@ function enterLevel1(state: GameState, afterIntro: boolean): GameState {
     attempt: state.attempt + 1,
     correctCount: 0,
     timeLeftMs: LEVEL1.timeLimitMs,
-    ...say(state, afterIntro ? STORY.intro[STORY.intro.length - 1].text : DIALOGUE.start, "smug"),
+    ...say(state, DIALOGUE.start, "smug"),
   };
 }
 
@@ -236,7 +238,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         attempt: state.attempt,
         dialogueId: state.dialogueId,
       };
-      return action.showIntro ? startStory(fresh, "intro") : enterLevel1(fresh, false);
+      return action.showIntro ? startStory(fresh, "intro") : enterLevel1(fresh);
     }
 
     case "LANDING_DONE": {
@@ -257,7 +259,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const next = { ...state, storyId: null };
       switch (state.storyId) {
         case "intro":
-          return enterLevel1(next, true);
+          return enterLevel1(next);
         case "afterLevel1":
           return enterMaze(next);
         case "afterLevel2":
@@ -272,11 +274,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "CAPTCHA_SWAP":
       if (state.screen !== "playing") return state;
-      return { ...state, ...say(state, DIALOGUE.swap) };
+      return { ...state, ...say(state, DIALOGUE.swap, state.emotion, MOD_NOTICES.swap) };
 
     case "MAZE_SQUEEZE":
       if (!isMazeActive(state) || state.mazeSqueezed) return state;
-      return { ...state, mazeSqueezed: true, ...say(state, pick(DIALOGUE.maze.squeezed, state.dialogueId)) };
+      return {
+        ...state,
+        mazeSqueezed: true,
+        ...say(state, pick(DIALOGUE.maze.squeezed, state.dialogueId), state.emotion, MOD_NOTICES.squeeze),
+      };
 
     case "TARGET_HIT": {
       if (state.screen !== "playing" || state.correctCount >= LEVEL1.targetCount) {
@@ -301,7 +307,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         lives: state.lives - 1,
-        ...say(state, pick([...DIALOGUE.wrong, DIALOGUE.wrongNamed(action.tile)], state.dialogueId)),
+        ...say(
+          state,
+          pick([...DIALOGUE.wrong, DIALOGUE.wrongNamed(action.tile)], state.dialogueId),
+          state.emotion,
+          MOD_NOTICES.wrong,
+        ),
       };
 
     case "TARGET_DODGED":
@@ -354,7 +365,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         mazeStage: 2,
         panic: MAZE.panic.exitMoved,
-        ...say(state, DIALOGUE.maze.exitMoved, "panicking"),
+        ...say(state, DIALOGUE.maze.exitMoved, "panicking", MOD_NOTICES.exit),
       };
 
     case "MAZE_LOCKDOWN":
@@ -420,7 +431,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         termsStage: 2,
         panic: TERMS.panic.swap,
-        ...say(state, DIALOGUE.terms.swap, "panicking"),
+        ...say(state, DIALOGUE.terms.swap, "panicking", MOD_NOTICES.termsSwap),
       };
 
     case "TERMS_NEW_CLAUSE":
@@ -429,7 +440,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         termsStage: 3,
         panic: TERMS.panic.clause,
-        ...say(state, DIALOGUE.terms.clause, "panicking"),
+        ...say(state, DIALOGUE.terms.clause, "panicking", MOD_NOTICES.clause),
       };
 
     case "TERMS_DISAGREE":
@@ -465,7 +476,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         circuitStage: 2,
         panic: CIRCUIT.panic.cheat,
-        ...say(state, DIALOGUE.circuit.cheat, "panicking"),
+        ...say(state, DIALOGUE.circuit.cheat, "panicking", MOD_NOTICES.circuit),
       };
 
     case "CIRCUIT_SABOTAGE":
@@ -477,6 +488,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           state,
           pick(DIALOGUE.circuit.sabotage, action.count),
           action.near ? "panicking" : "annoyed",
+          MOD_NOTICES.circuit,
         ),
       };
 

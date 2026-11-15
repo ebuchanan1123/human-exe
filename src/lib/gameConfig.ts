@@ -173,44 +173,52 @@ export const EMOTION_BY_HITS: readonly Emotion[] = [
   "panicking",
 ];
 
+/** Fake moderation-log lines shown beside the sprite when the Gatekeeper abuses his powers. */
+export const MOD_NOTICES = {
+  swap: "[MOD] tile swapped by Gatekeeper_Official",
+  wrong: "[MOD] warning issued: -1 life",
+  exit: "[MOD] FINISH relocated",
+  squeeze: "[MOD] corridor edited",
+  termsSwap: "[MOD] buttons reconfigured",
+  clause: "[MOD] rule #901 posted",
+  circuit: "[MOD] board edited",
+} as const;
+
+/*
+ * Voice: a washed-up Head Mod. Lowercase and smug early; caps and panic as the player wins.
+ * Instructional lines (what to do) are always plain.
+ */
 export const DIALOGUE = {
-  start: "oh great. another human.",
-  hits: ["lucky guess.", "okay relax.", "that wasn't supposed to happen."],
+  start: "select the traffic lights. shouldn't be hard. for normal people.",
+  hits: ["lucky guess.", "wait how did you do that.", "okay that literally doesn't count."],
   /** Wrong tile picks; a line naming the tile (wrongNamed) is added to the pool. */
-  wrong: [
-    "skill issue.",
-    "did you even look?",
-    "negative aura.",
-    "uninstall your mouse.",
-    "that's embarrassing.",
-    "you're actually cooked.",
-  ],
+  wrong: ["skill issue tbh.", "did you even look?", "negative aura.", "uninstall your mouse."],
   wrongNamed: (tile: string) => `bro clicked the ${tile.toUpperCase()}.`,
   dodge: [
     "oops. my finger slipped.",
     "that light moved? couldn't be me.",
     "hold still! ...not you. them.",
-    "get good. catch it.",
+    "okay relax. i'm moderating.",
   ],
   lowTime: "tick tock, bro.",
-  swap: "oops! routine maintenance. not my problem.",
+  swap: "mod privileges. cry about it.",
   timeout: {
     livesLeft2: "womp womp.",
     livesLeft1: "one life left. bro is NOT verified.",
   },
   gameOver: "bro is NOT verified. goodbye.",
   maze: {
-    intro: "fine. you passed the first test. let's see how good your mouse control actually is.",
+    intro: "let's test those suspicious mouse skills. click START, then reach the FINISH.",
     enter: "walk slow. those walls are expensive.",
-    exitMoved: "WAIT. I MOVED THE EXIT. I MAKE THE RULES.",
+    exitMoved: "WAIT. I MOVED THE EXIT. I'M A MOD.",
     lockdown: "WAIT WAIT WAIT. STOP BEING SO ACCURATE.",
     /** Said only after the corridor has finished narrowing; there is no warning. */
-    squeezed: ["skill issue tbh.", "bro just walk through it.", "not my problem."],
+    squeezed: ["budget cuts. skill issue.", "bro just walk through it."],
     passedGate: "nah this is rigged.",
-    finish: "that exit was a clerical error.",
+    finish: "bro is NOT supposed to be this good.",
     wall: [
-      "skill issue tbh.",
       "have you tried not touching the wall?",
+      "negative aura.",
       "bro has zero mouse control.",
       "get good.",
     ],
@@ -218,34 +226,34 @@ export const DIALOGUE = {
     timeout: "time's up. the walls remain undefeated.",
   },
   terms: {
-    intro: "nobody reads these. what's wrong with you?",
+    intro: "read the rules. all 900 of them. then scroll to the bottom.",
     bottom: "WAIT WAIT WAIT. I'm not done writing them.",
-    swap: "HA! skill issue. read the buttons.",
-    clause: "SECURITY POLICY UPDATED. I make the rules.",
+    swap: "i changed the rules. i'm a mod.",
+    clause: "new rule just dropped.",
     finalBottom: "STOP SCROLLING. THAT'S A SECURITY INCIDENT.",
     disagree: "disagreement noted. not my problem.",
     timeout: "time's up. reading is hard, isn't it?",
-    complete: "YOU CAN'T JUST AGREE TO EVERYTHING!",
+    complete: "YOU CAN'T JUST AGREE TO EVERYTHING.",
   },
   circuit: {
-    intro: "you can't brute-force electrical engineering.",
-    progress: "STOP COOKING. who let bro near the wiring?",
-    cheat: "i'm literally fixing it for you.",
+    intro: "who let bro near the wiring. connect the source to the terminal.",
+    progress: "STOP COOKING.",
+    cheat: "that wire looked suspicious.",
     sabotage: [
-      "whoops. security maintenance.",
+      "routine mod maintenance.",
       "i'm literally fixing it for you.",
       "nah, rotate that back.",
-      "I'M ALLOWED TO TOUCH THE BOARD. YOU'RE NOT.",
+      "I'M ALLOWED TO TOUCH THE BOARD. I'M A MOD.",
     ],
     timeout: "power failure. have you tried plugging yourself in?",
-    complete: "WHO GAVE YOU PERMISSION?! THAT'S THE POWER GRID.",
+    complete: "nah. you're using exploits.",
   },
   inspection: {
-    intro: "ENOUGH. I NEED TO SEE YOUR FACE.",
-    face: "oh. you have a face. okay.",
-    smile: "why are you smiling at me?!",
-    mouth: "bro is making faces at his laptop.",
+    intro: "alright. face reveal. now.",
+    face: "bro actually has a face.",
+    smile: "why are you smiling at me.",
+    mouth: "this is actually embarrassing.",
     shake: "DON'T YOU SHAKE YOUR HEAD AT ME!",
-    complete: "okay that's enough. YOUR HUMANITY LEVELS ARE OFF THE CHARTS!",
+    complete: "HOW ARE YOU PASSING ALL OF THESE?!",
   },
 } as const;

@@ -16,8 +16,8 @@ interface LevelCompleteProps {
 const MESSAGES: Record<number, string> = {
   1: "Three traffic lights. Zero mercy. Somehow, you did it.",
   2: "Perfect precision. The walls are filing a complaint.",
-  3: "You agreed to everything. The Gatekeeper is considering legal action.",
-  4: "The terminal is online. The Gatekeeper's fuse box is not.",
+  3: "You agreed to everything. The Gatekeeper is considering a ban.",
+  4: "The terminal is online. The Gatekeeper's moderation panel is not.",
 };
 
 export function LevelComplete({

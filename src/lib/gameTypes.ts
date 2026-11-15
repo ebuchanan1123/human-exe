@@ -98,6 +98,8 @@ export interface GameState {
   attempt: number;
   emotion: Emotion;
   dialogue: string;
+  /** Fake moderation-log line shown with the current dialogue event, or null. */
+  modNotice: string | null;
   /** Incremented on every dialogue event; used for animation keys and line selection. */
   dialogueId: number;
 }

@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { EMOTION_META, GATEKEEPER_SPRITES } from "@/lib/gameConfig";
+import type { ModStatus } from "@/lib/gatekeeperProfile";
 import type { Emotion } from "@/lib/gameTypes";
+import { ModProfile } from "@/components/ModProfile";
 
 interface GatekeeperProps {
   emotion: Emotion;
   dialogue: string;
   /** Changes on every new line so the dialogue panel re-animates even for repeated text. */
   dialogueId?: number;
+  /** Presence status shown under his name. */
+  status?: ModStatus;
+  /** Fake moderation log line that flashes over the sprite for the current dialogue event. */
+  notice?: string | null;
   /** Plays a strong one-off recoil, e.g. when the player clears a level. */
   startled?: boolean;
   /** False when a parent (e.g. DialogueScene) draws its own dialogue window. */
@@ -46,6 +52,8 @@ export function Gatekeeper({
   emotion,
   dialogue,
   dialogueId,
+  status = "ONLINE",
+  notice = null,
   startled = false,
   showDialogue = true,
   className = "",
@@ -90,7 +98,8 @@ export function Gatekeeper({
           aria-live="polite"
         >
           <div className="titlebar px-2 py-0.5 font-pixel text-[8px]">GATEKEEPER.EXE</div>
-          <p className="flex min-h-[7.5rem] items-center bg-cream p-2 font-body text-xl leading-tight text-bg">
+          <ModProfile status={status} />
+          <p className="flex min-h-[6.5rem] items-center bg-cream p-2 font-body text-xl leading-tight text-bg">
             {dialogue}
           </p>
         </motion.div>
@@ -187,6 +196,16 @@ export function Gatekeeper({
         >
           {meta.label}
         </span>
+
+        {notice && (
+          <div
+            key={dialogueId ?? notice}
+            aria-hidden="true"
+            className="animate-toast bevel-out pointer-events-none absolute inset-x-2 top-10 z-10 bg-panel p-0.5"
+          >
+            <p className="bg-bg px-1.5 py-1 font-pixel text-[7px] leading-snug text-mint">{notice}</p>
+          </div>
+        )}
       </div>
     </section>
   );

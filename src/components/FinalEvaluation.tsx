@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, Check, Coffee, Home, RotateCcw, SkipForward } from "lucide-react";
+import { AlertTriangle, Check, Coffee, Gavel, Home, RotateCcw, SkipForward } from "lucide-react";
 import { motion } from "motion/react";
 import { DialogueScene } from "@/components/DialogueScene";
 import { formatRunTime } from "@/components/GameHUD";
@@ -11,6 +11,7 @@ import { PixelButton } from "@/components/PixelButton";
 import { RetroWindow } from "@/components/RetroWindow";
 import { STARTING_LIVES } from "@/lib/gameConfig";
 import type { Emotion, InspectionOutcome } from "@/lib/gameTypes";
+import { MOD_PROFILE } from "@/lib/gatekeeperProfile";
 import { FINAL_MELTDOWN } from "@/lib/storyScenes";
 
 interface FinalEvaluationProps {
@@ -31,17 +32,17 @@ const TOTAL_ROWS = CHECKS.length + 1;
 
 const QUIPS: Record<"passed" | "skipped", readonly string[]> = {
   passed: [
-    "Hm. A face. Fine.",
-    "A smile. Suspicious.",
-    "...Why would you do that?",
-    "It shook its head at me. That can't be right.",
+    "bro actually has a face.",
+    "why are you smiling at me.",
+    "this is actually embarrassing.",
+    "it shook its head at me. that can't be right.",
     "WHAT. IS. THAT. NUMBER.",
   ],
   skipped: [
-    "No camera, no face on file.",
-    "No smile on record.",
-    "Mouth status: unknown.",
-    "Behavior: unobserved.",
+    "no camera, no face on file.",
+    "no smile on record.",
+    "mouth status: unknown.",
+    "behavior: unobserved.",
     "ESTIMATED FROM VIBES. AND THE VIBES ARE VERY HUMAN.",
   ],
 };
@@ -87,6 +88,7 @@ export function FinalEvaluation({
         title="gatekeeper_meltdown.exe"
         skipLabel="SKIP TO VERDICT"
         continueLabel="SEE VERDICT"
+        status="ADMIN ABUSE DETECTED"
         onDone={() => setPhase("denied")}
       />
     );
@@ -95,12 +97,13 @@ export function FinalEvaluation({
   if (phase === "denied") {
     return (
       <div className="relative w-full max-w-4xl animate-shake-twice">
-        <RetroWindow title="access_control.exe" className="w-full">
+        <RetroWindow title="ban_notice.exe" className="w-full">
           <div className="grid items-center gap-4 sm:grid-cols-[17rem_minmax(0,1fr)]">
             <Gatekeeper
               emotion="meltdown"
-              dialogue="ACCESS DENIED. I'm going to lie down now."
+              dialogue="my server. my rules. skill issue."
               dialogueId={99}
+              status="ADMIN ABUSE DETECTED"
               startled
               className="mx-auto w-full max-w-[14rem] sm:max-w-none"
             />
@@ -109,22 +112,27 @@ export function FinalEvaluation({
                 initial={{ scale: 2.6, rotate: -20, opacity: 0 }}
                 animate={{ scale: 1, rotate: -4, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 240, damping: 14 }}
-                className="border-4 border-danger bg-bg/40 px-4 py-2 font-pixel text-2xl leading-tight text-danger [text-shadow:3px_3px_0_#131D25] sm:text-4xl"
+                className="flex items-center gap-3 border-4 border-danger bg-bg/40 px-4 py-2 font-pixel text-xl leading-tight text-danger [text-shadow:3px_3px_0_#131D25] sm:text-3xl"
               >
-                ACCESS
-                <br />
-                DENIED
+                <Gavel className="h-8 w-8 shrink-0 sm:h-10 sm:w-10" aria-hidden="true" />
+                <span>
+                  YOU HAVE
+                  <br />
+                  BEEN BANNED
+                </span>
               </motion.h2>
 
-              <div className="bevel-in w-full bg-bg p-3">
-                <p className="font-pixel text-[10px] text-cream/60">REASON</p>
-                <p className="font-pixel text-base text-danger sm:text-xl">EXCESSIVE HUMANITY</p>
-              </div>
-
-              <p className="font-body text-2xl leading-tight text-cream">
-                Your humanity exceeds the maximum permitted by this facility. Please return when you
-                are less human.
+              <p className="flex items-center gap-2 bg-danger px-2 py-1 font-pixel text-[8px] text-bg">
+                <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                ADMIN ABUSE DETECTED
               </p>
+
+              <dl className="bevel-in w-full bg-bg p-3 text-left">
+                <BanRow label="REASON" value="EXCESSIVE HUMANITY" />
+                <BanRow label="ISSUED BY" value={MOD_PROFILE.username.slice(1)} />
+                <BanRow label="APPEAL STATUS" value="AUTOMATICALLY DENIED" />
+              </dl>
+
               <p className="font-body text-xl leading-tight text-mint">
                 (You proved you&apos;re human. He just can&apos;t handle it.)
               </p>
@@ -153,7 +161,7 @@ export function FinalEvaluation({
                   BACK TO WEBSITE
                 </PixelButton>
               </div>
-              <p className="font-pixel text-[8px] text-cream/50">GATEKEEPER STATUS: ON BREAK. PERMANENTLY.</p>
+              <p className="font-pixel text-[8px] text-cream/50">GATEKEEPER STATUS: ADMIN ABUSE DETECTED</p>
             </div>
           </div>
         </RetroWindow>
@@ -168,7 +176,7 @@ export function FinalEvaluation({
   const quips = QUIPS[skipped ? "skipped" : "passed"];
   const dialogue =
     revealed === 0
-      ? "Running final evaluation. This should be quick. Nobody has ever passed."
+      ? "running final evaluation. this should be quick. nobody has ever passed."
       : quips[revealed - 1];
 
   return (
@@ -178,6 +186,7 @@ export function FinalEvaluation({
           emotion={EMOTION_BY_ROW[revealed]}
           dialogue={dialogue}
           dialogueId={revealed}
+          status="INVISIBLE"
           className="mx-auto w-full max-w-[14rem] sm:max-w-none"
         />
 
@@ -271,6 +280,15 @@ function Pass() {
       <Check className="h-4 w-4" strokeWidth={4} aria-hidden="true" />
       PASS
     </span>
+  );
+}
+
+function BanRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-b-2 border-panel py-1 last:border-b-0">
+      <dt className="font-pixel text-[9px] text-cream/60">{label}</dt>
+      <dd className="font-pixel text-[10px] text-danger sm:text-xs">{value}</dd>
+    </div>
   );
 }
 

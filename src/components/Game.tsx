@@ -18,6 +18,7 @@ import { TermsAndConditions } from "@/components/TermsAndConditions";
 import { TitleScreen } from "@/components/TitleScreen";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { LEVEL1 } from "@/lib/gameConfig";
+import { statusForProgress } from "@/lib/gatekeeperProfile";
 import type { Screen } from "@/lib/gameTypes";
 import { STORY } from "@/lib/storyScenes";
 
@@ -48,11 +49,15 @@ export function Game() {
     if (new URLSearchParams(window.location.search).get("skip") === "landing") skipLanding();
   }, [skipLanding]);
 
+  const modStatus = statusForProgress({ screen, level: state.level, storyId: state.storyId });
+
   const gatekeeper = (
     <Gatekeeper
       emotion={state.emotion}
       dialogue={state.dialogue}
       dialogueId={state.dialogueId}
+      status={modStatus}
+      notice={state.modNotice}
       startled={
         screen === "cleared" ||
         screen === "mazeCleared" ||
@@ -104,6 +109,7 @@ export function Game() {
               key={state.storyId}
               lines={STORY[state.storyId]}
               skipLabel={state.storyId === "intro" ? "SKIP INTRO" : "SKIP DIALOGUE"}
+              status={modStatus}
               onDone={engine.storyDone}
             />
           )}

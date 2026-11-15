@@ -5,8 +5,10 @@ import type { KeyboardEvent } from "react";
 import { ChevronRight, FastForward } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { Gatekeeper } from "@/components/Gatekeeper";
+import { ModProfile } from "@/components/ModProfile";
 import { PixelButton } from "@/components/PixelButton";
 import { RetroWindow } from "@/components/RetroWindow";
+import type { ModStatus } from "@/lib/gatekeeperProfile";
 import type { StoryLine } from "@/lib/storyScenes";
 
 interface DialogueSceneProps {
@@ -16,6 +18,8 @@ interface DialogueSceneProps {
   skipLabel?: string;
   continueLabel?: string;
   title?: string;
+  /** His presence status shown under his name. */
+  status?: ModStatus;
 }
 
 const MS_PER_CHAR = 26;
@@ -26,6 +30,7 @@ export function DialogueScene({
   skipLabel = "SKIP DIALOGUE",
   continueLabel = "CONTINUE",
   title = "gatekeeper_briefing.exe",
+  status = "ONLINE",
 }: DialogueSceneProps) {
   const reduceMotion = useReducedMotion();
   const [scene, setScene] = useState({ index: 0, shown: 0 });
@@ -104,7 +109,8 @@ export function DialogueScene({
                   {index + 1}/{lines.length}
                 </span>
               </div>
-              <p className="min-h-[11rem] bg-cream p-4 font-body text-2xl leading-snug text-bg sm:text-3xl">
+              <ModProfile status={status} />
+              <p className="min-h-[10rem] bg-cream p-4 font-body text-2xl leading-snug text-bg sm:text-3xl">
                 <span className="sr-only">{line.text}</span>
                 <span aria-hidden="true">
                   {line.text.slice(0, shown)}
